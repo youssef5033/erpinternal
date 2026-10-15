@@ -36,6 +36,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   if (sp.country) conds.push(ilike(sql`coalesce(${leads.country}, '')`, `%${sp.country}%`));
   if (sp.tag) conds.push(sql`${sp.tag} = any(${leads.tags})`);
   if (sp.campaign) conds.push(eq(leads.campaignId, sp.campaign));
+  if (sp.from) conds.push(sql`${leads.dateAdded} >= ${sp.from}`);
+  if (sp.to) conds.push(sql`${leads.dateAdded} <= ${sp.to}`);
   if (sp.due === "overdue") conds.push(sql`coalesce(${leads.nextActionDate}, ${leads.followUpDate}) < ${today}`);
   const where = and(...conds, ne(leads.status, "merged"));
   const page = Math.max(1, Number(sp.page ?? 1));

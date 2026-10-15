@@ -33,11 +33,17 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   const status = sp.status ?? (view === "table" ? "open" : "open");
   const conds: (SQL | undefined)[] = [opportunityVisibility(actor), status === "all" ? undefined : eq(opportunities.status, status as "open")];
   if (sp.q) conds.push(or(ilike(opportunities.name, `%${sp.q}%`), ilike(accounts.name, `%${sp.q}%`), ilike(opportunities.number, `%${sp.q}%`)));
-  if (sp.owner) conds.push(eq(opportunities.ownerId, sp.owner));
+  if (sp.owner) conds.push(sp.owner === "none" ? sql`${opportunities.ownerId} is null` : eq(opportunities.ownerId, sp.owner));
   if (sp.stage) conds.push(eq(opportunities.stageId, sp.stage));
   if (sp.service) conds.push(sql`exists (select 1 from ${opportunityServices} os where os.opportunity_id = ${q(opportunities.id)} and os.service_id = ${sp.service})`);
   if (sp.kind) conds.push(eq(opportunities.kind, sp.kind as "expansion"));
-  if (sp.channel) conds.push(eq(opportunities.acquisitionChannel, sp.channel));
+  if (sp.channel) conds.push(sp.channel === "unknown" ? sql`${opportunities.acquisitionChannel} is null` : eq(opportunities.acquisitionChannel, sp.channel));
+  if (sp.campaign) conds.push(eq(opportunities.campaignId, sp.campaign));
+  // Date windows used by analytics drill-downs: created / won / lost in an inclusive range.
+  if (sp.from && sp.to) {
+    const col = sp.dateBasis === "won" ? opportunities.wonAt : sp.dateBasis === "lost" ? opportunities.lostAt : sp.dateBasis === "closed" ? sql`coalesce(${opportunities.wonAt}, ${opportunities.lostAt})` : opportunities.createdAt;
+    conds.push(sql`${col}::date between ${sp.from} and ${sp.to}`);
+  }
   if (sp.noNext === "1") conds.push(sql`(${opportunities.nextAction} is null or ${opportunities.nextActionDate} is null)`);
   const rows = await db
     .select({
