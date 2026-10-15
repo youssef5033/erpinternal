@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { f } from "@/lib/formdata";
-import { taxRates, ledgerAccounts } from "@/db/schema";
+import { forecastAdjustments, forecastScenarios, ledgerAccounts, taxRates } from "@/db/schema";
 import { runAction, type ActionState } from "./run";
 import { audit } from "../audit";
 import { assertCan } from "../auth/actor";
@@ -436,4 +436,41 @@ export async function runRecurringNowAction(_p: ActionState, fd: FormData) {
     const r = await runRecurringSchedules(tx, actor, await agencyToday(tx));
     return `${r} draft invoice(s) generated from recurring schedules.`;
   } });
+}
+
+/* ---------------- Cash forecast ---------------- */
+
+export async function forecastAdjustmentAction(_p: ActionState, fd: FormData) {
+  return runAction(fd, {
+    permission: "finance.write",
+    action: "forecast.adjustment",
+    schema: z.object({ id: f.optId(), op: f.enumOf(["add", "delete"] as const), scenarioKey: f.enumOf(["base", "conservative", "upside", "all"] as const).optional(), weekStart: f.optDate(), description: f.optStr(500), amount: f.optMoney(), currency: f.optStr(3), direction: f.enumOf(["inflow", "outflow"] as const).optional(), recurring: f.enumOf(["none", "weekly", "monthly"] as const).optional() }),
+    run: async ({ actor, tx, data }) => {
+      if (data.op === "delete") {
+        if (!data.id) throw new ValidationError("Missing adjustment.");
+        await tx.delete(forecastAdjustments).where(eq(forecastAdjustments.id, data.id));
+        await audit(tx, actor, { action: "forecast.adjustment_deleted", entityType: "forecast_adjustment", entityId: data.id, summary: "Forecast adjustment removed" });
+        return "Adjustment removed.";
+      }
+      if (!data.weekStart || !data.description || !data.amount || !data.currency || !data.direction) throw new ValidationError("Week, description, amount, currency and direction are required.");
+      const [row] = await tx.insert(forecastAdjustments).values({ scenarioKey: data.scenarioKey ?? "all", weekStart: data.weekStart, description: data.description, amount: data.amount, currency: data.currency.toUpperCase(), direction: data.direction, recurring: data.recurring ?? "none", createdBy: actor.userId || null }).returning();
+      await audit(tx, actor, { action: "forecast.adjustment_added", entityType: "forecast_adjustment", entityId: row.id, summary: `${data.direction} ${data.currency} ${data.amount}: ${data.description}` });
+      return "Adjustment added to the forecast (it is an assumption, not a transaction).";
+    },
+  });
+}
+
+export async function forecastScenarioAction(_p: ActionState, fd: FormData) {
+  return runAction(fd, {
+    permission: "finance.write",
+    action: "forecast.scenario",
+    schema: z.object({ key: f.enumOf(["base", "conservative", "upside"] as const), collectionDelayDays: f.int(), collectionRatePercent: f.int(), pipelineInclusionPercent: f.int(), expenseMultiplierPercent: f.int(), notes: f.text() }),
+    run: async ({ actor, tx, data }) => {
+      for (const [k, v] of [["collectionRatePercent", data.collectionRatePercent], ["pipelineInclusionPercent", data.pipelineInclusionPercent]] as const) if (v < 0 || v > 100) throw new ValidationError(`${k} must be 0–100.`);
+      const names = { base: "Base", conservative: "Conservative", upside: "Upside" };
+      await tx.insert(forecastScenarios).values({ ...data, name: names[data.key] }).onConflictDoUpdate({ target: forecastScenarios.key, set: { collectionDelayDays: data.collectionDelayDays, collectionRatePercent: data.collectionRatePercent, pipelineInclusionPercent: data.pipelineInclusionPercent, expenseMultiplierPercent: data.expenseMultiplierPercent, notes: data.notes } });
+      await audit(tx, actor, { action: "forecast.scenario_updated", entityType: "forecast_scenario", entityId: null, summary: `${data.key}: delay ${data.collectionDelayDays}d, collect ${data.collectionRatePercent}%, pipeline ${data.pipelineInclusionPercent}%, costs ${data.expenseMultiplierPercent}%` });
+      return "Scenario assumptions saved.";
+    },
+  });
 }
