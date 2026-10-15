@@ -278,8 +278,8 @@ export function daysOverdue(dueDate: string | null, today: string) {
 
 /** SQL expression for outstanding amount, usable in list queries. */
 export const outstandingSql = sql<string>`(${invoices.total}
-  - coalesce((select sum(pa.amount) from payment_allocations pa where pa.invoice_id = ${invoices.id} and pa.reversed_at is null), 0)
-  - coalesce((select sum(cn.total) from credit_notes cn where cn.invoice_id = ${invoices.id} and cn.status = 'issued'), 0))`;
+  - coalesce((select sum(pa.amount) from payment_allocations pa where pa.invoice_id = "invoices"."id" and pa.reversed_at is null), 0)
+  - coalesce((select sum(cn.total) from credit_notes cn where cn.invoice_id = "invoices"."id" and cn.status = 'issued'), 0))`;
 
 export async function listInvoicesWithBalances(tx: Tx, where?: SQL) {
   const rows = await tx

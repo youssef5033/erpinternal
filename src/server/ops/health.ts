@@ -78,7 +78,7 @@ export async function accountHealth(tx: Tx, accountId: string, opts: { includeBu
     const [last] = await tx
       .select({ at: activities.occurredAt })
       .from(activities)
-      .where(and(eq(activities.accountId, accountId), inArray(activities.type, ["email", "call", "meeting", "message", "linkedin"])))
+      .where(and(eq(activities.accountId, accountId), inArray(activities.type, ["email", "call", "meeting", "message", "linkedin"]), sql`coalesce(${activities.direction}, '') <> 'internal'`))
       .orderBy(desc(activities.occurredAt))
       .limit(1);
     const days = last ? Math.floor((Date.now() - last.at.getTime()) / 86400000) : null;

@@ -108,7 +108,7 @@ export async function completeEvent(
   await tx.update(events).set({ status: input.status, notes: input.notes || null, decisions: input.decisions || null, outcome: input.outcome || null }).where(eq(events.id, id));
   const activity = await logActivity(tx, actor, {
     type: ev.kind === "call" ? "call" : "meeting",
-    direction: "internal",
+    direction: ev.kind === "internal" ? "internal" : null,
     subject: `${ev.title} — ${input.status.replace("_", " ")}`,
     body: [input.notes && `Notes: ${input.notes}`, input.decisions && `Decisions: ${input.decisions}`].filter(Boolean).join("\n\n") || null,
     outcome: input.outcome ?? input.status,

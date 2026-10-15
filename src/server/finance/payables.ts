@@ -216,7 +216,7 @@ export async function billPaid(tx: Tx, billId: string) {
   return toMoney(r?.paid ?? 0);
 }
 
-export const billOutstandingSql = sql<string>`(${bills.total} - coalesce((select sum(a.amount) from supplier_payment_allocations a where a.bill_id = ${bills.id} and a.reversed_at is null),0))`;
+export const billOutstandingSql = sql<string>`(${bills.total} - coalesce((select sum(a.amount) from supplier_payment_allocations a where a.bill_id = "bills"."id" and a.reversed_at is null),0))`;
 
 /**
  * Pay supplier bills. The payment must be fully allocated to approved bills

@@ -214,7 +214,7 @@ export async function myDay(tx: Tx, actor: Actor, f: MyDayFilters) {
     .select({ ev: events, accountName: accounts.name })
     .from(events)
     .leftJoin(accounts, eq(accounts.id, events.accountId))
-    .where(and(eq(events.status, "scheduled"), gte(events.startsAt, new Date(`${today}T00:00:00Z`)), lt(events.startsAt, new Date(`${addDaysISO(horizon, 1)}T00:00:00Z`)), ownerId ? or(eq(events.organizerId, ownerId), sql`exists (select 1 from ${eventAttendees} ea where ea.event_id = ${events.id} and ea.user_id = ${ownerId})`) : undefined));
+    .where(and(eq(events.status, "scheduled"), gte(events.startsAt, new Date(`${today}T00:00:00Z`)), lt(events.startsAt, new Date(`${addDaysISO(horizon, 1)}T00:00:00Z`)), ownerId ? or(eq(events.organizerId, ownerId), sql`exists (select 1 from ${eventAttendees} ea where ea.event_id = "events"."id" and ea.user_id = ${ownerId})`) : undefined));
   for (const { ev, accountName } of evs) {
     items.push({
       id: `event:${ev.id}`,

@@ -325,7 +325,7 @@ async function detect(tx: Tx): Promise<DetectedSignal[]> {
     const [last] = await tx
       .select({ at: activities.occurredAt })
       .from(activities)
-      .where(and(eq(activities.opportunityId, p.opportunityId), inArray(activities.type, ["email", "call", "meeting", "message", "linkedin"])))
+      .where(and(eq(activities.opportunityId, p.opportunityId), inArray(activities.type, ["email", "call", "meeting", "message", "linkedin"]), sql`coalesce(${activities.direction}, '') <> 'internal'`))
       .orderBy(desc(activities.occurredAt))
       .limit(1);
     if (last && p.sentAt && last.at > p.sentAt) continue;

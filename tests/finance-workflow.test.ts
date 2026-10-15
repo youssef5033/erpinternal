@@ -356,3 +356,13 @@ describe("milestone billing and recognition", () => {
     await expect(Promise.reject(new ValidationError("x"))).rejects.toThrow();
   });
 });
+
+describe("derived balances in single-table queries", () => {
+  it("outstandingSql uses qualified correlation (regression)", async () => {
+    const { outstandingSql } = await import("@/server/finance/invoices");
+    const rows = await db.select({ id: invoices.id, total: invoices.total, o: outstandingSql }).from(invoices).where(eq(invoices.status, "issued"));
+    const bal = await db.transaction((tx) => invoiceBalances(tx, rows.map((r) => r.id)));
+    for (const r of rows) expect(Number(r.o).toFixed(2)).toBe(bal.find((b) => b.invoiceId === r.id)!.outstanding);
+    expect(rows.some((r) => Number(r.o) < Number(r.total))).toBe(true);
+  });
+});

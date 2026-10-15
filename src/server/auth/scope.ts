@@ -29,7 +29,7 @@ export function engagementVisibility(actor: Actor, perm: Permission = "delivery.
   return or(
     eq(engagements.ownerId, actor.userId),
     exists(
-      sql`(select 1 from ${engagementMembers} em where em.engagement_id = ${engagements.id} and em.user_id = ${actor.userId})`,
+      sql`(select 1 from ${engagementMembers} em where em.engagement_id = "engagements"."id" and em.user_id = ${actor.userId})`,
     ),
   );
 }
@@ -93,7 +93,7 @@ export function invoiceVisibility(actor: Actor): SQL | undefined {
  * documents on assigned engagements / owned accounts.
  */
 export function documentVisibility(actor: Actor): SQL | undefined {
-  const granted = exists(sql`(select 1 from ${documentAccess} da where da.document_id = ${documents.id} and da.user_id = ${actor.userId})`);
+  const granted = exists(sql`(select 1 from ${documentAccess} da where da.document_id = "documents"."id" and da.user_id = ${actor.userId})`);
   const own = or(eq(documents.uploadedBy, actor.userId), eq(documents.ownerId, actor.userId));
   const scope = scopeOf(actor, "documents.read");
   const classes: SQL[] = [];
