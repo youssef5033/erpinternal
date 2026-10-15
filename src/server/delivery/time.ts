@@ -92,6 +92,7 @@ export async function approveTimeEntries(tx: Tx, actor: Actor, ids: string[]) {
   const missingRate: string[] = [];
   for (const e of rows) {
     if (e.status === "approved") continue;
+    if (e.userId && e.userId === actor.userId) throw new ForbiddenError("You cannot approve your own time.");
     if (e.engagementId && !canAll(actor, "time.approve")) await assertEngagementAccess(tx, actor, e.engagementId, "time.approve");
     const rate = await costRateOn(tx, e.personId, e.workDate);
     if (!rate) missingRate.push(e.id);
@@ -122,6 +123,12 @@ export async function approveTimeEntries(tx: Tx, actor: Actor, ids: string[]) {
 export async function rejectTimeEntries(tx: Tx, actor: Actor, ids: string[], reason: string) {
   assertCan(actor, "time.approve");
   if (!reason.trim()) throw new ValidationError("Give a reason.");
+  const existing = await tx.select().from(timeEntries).where(inArray(timeEntries.id, ids)).for("update");
+  for (const e of existing) {
+    if (e.userId && e.userId === actor.userId) throw new ForbiddenError("You cannot review your own time.");
+    if (e.status === "approved" && !canAll(actor, "time.approve")) throw new ForbiddenError("Only full approvers can reopen approved time.");
+    if (e.engagementId && !canAll(actor, "time.approve")) await assertEngagementAccess(tx, actor, e.engagementId, "time.approve");
+  }
   const rows = await tx
     .update(timeEntries)
     .set({ status: "rejected", rejectionReason: reason, approvedBy: null, approvedAt: null, costRate: null, costAmount: null, costCurrency: null })
