@@ -5,20 +5,33 @@ export const inputClass =
   "block w-full rounded-md border border-line-strong bg-surface px-2.5 py-1.5 text-[13.5px] text-ink placeholder:text-faint focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:bg-sunken disabled:text-muted aria-[invalid=true]:border-danger";
 
 export function Field({ label, htmlFor, hint, error, required, children, className }: { label: string; htmlFor?: string; hint?: ReactNode; error?: string; required?: boolean; children: ReactNode; className?: string }) {
+  const caption = (
+    <span className="mb-1 block text-[12.5px] font-medium text-ink-2">
+      {label}
+      {required ? <span className="text-danger"> *</span> : null}
+    </span>
+  );
+  const note = error ? (
+    <span className="mt-1 block text-[12px] font-normal text-danger" role="alert">
+      {error}
+    </span>
+  ) : hint ? (
+    <span className="mt-1 block text-[12px] font-normal text-muted">{hint}</span>
+  ) : null;
+  // Without an explicit id, the label wraps the control so it is programmatically associated.
+  if (!htmlFor)
+    return (
+      <label className={cn("block min-w-0", className)}>
+        {caption}
+        {children}
+        {note}
+      </label>
+    );
   return (
     <div className={cn("min-w-0", className)}>
-      <label htmlFor={htmlFor} className="mb-1 block text-[12.5px] font-medium text-ink-2">
-        {label}
-        {required ? <span className="text-danger"> *</span> : null}
-      </label>
+      <label htmlFor={htmlFor}>{caption}</label>
       {children}
-      {error ? (
-        <p className="mt-1 text-[12px] text-danger" role="alert">
-          {error}
-        </p>
-      ) : hint ? (
-        <p className="mt-1 text-[12px] text-muted">{hint}</p>
-      ) : null}
+      {note}
     </div>
   );
 }

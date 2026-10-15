@@ -635,3 +635,10 @@ export async function completeEventAction(_p: ActionState, fd: FormData) {
   });
 }
 
+
+export async function generateDraftsAction(_p: ActionState, fd: FormData) {
+  return runAction(fd, { permission: "crm.write", action: "outreach.generate_drafts", schema: z.object({}), run: async ({ actor, tx }) => {
+    const r = await generateDueDrafts(tx, actor);
+    return `${r} new draft(s) created for due sequence steps.`;
+  } });
+}
