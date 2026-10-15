@@ -133,7 +133,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                         <Field label="Date"><Input type="date" name="issueDate" defaultValue={today} /></Field>
                         <Field label="Reason" required><Input name="reason" required /></Field>
                       </FormGrid>
-                      <p className="mt-2 text-[12px] text-muted">Tax is reversed proportionally to the invoice's tax. The credit cannot exceed the outstanding balance.</p>
+                      <p className="mt-2 text-[12px] text-muted">Tax is reversed proportionally to the invoice&rsquo;s tax. The credit cannot exceed the outstanding balance.</p>
                       <div className="mt-2 flex justify-end"><SubmitButton confirm="Issue this credit note? It is posted immediately.">Issue credit note</SubmitButton></div>
                     </ActionForm>
                   </details>

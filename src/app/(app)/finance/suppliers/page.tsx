@@ -46,7 +46,7 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
             </tbody>
           </Table>
         ) : <EmptyState title="No suppliers" />}
-        <p className="border-t border-line px-4 py-2 text-[12px] text-muted">Spend and unpaid amounts are in each bill's own currency summed per supplier; suppliers billing in several currencies should be checked on their page.</p>
+        <p className="border-t border-line px-4 py-2 text-[12px] text-muted">Spend and unpaid amounts are in each bill&rsquo;s own currency summed per supplier; suppliers billing in several currencies should be checked on their page.</p>
       </Card>
     </>
   );

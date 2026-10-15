@@ -8,7 +8,7 @@ import { agencyToday, getSettings } from "@/server/system/settings";
 import { myDay, numbersAndEvidence, pipelineAndCapacity, setupChecklist, systemHealth, type WorkItem } from "@/server/ops/dashboard";
 import { refreshSignals, SIGNAL_RULES } from "@/server/ops/signals";
 import { lastSignalRefresh } from "@/server/jobs/registry";
-import { addDaysISO, formatDate, formatDateTime, resolvePeriod } from "@/lib/dates";
+import { addDaysISO, formatDate, formatDateTime, resolvePeriod, nowMs } from "@/lib/dates";
 import { qs } from "@/lib/utils";
 import { Badge, Card, CardBody, CardHeader, EmptyState, LinkButton, Notice, PageHeader, PriorityBadge, StatusBadge, Table, TD, TH, THead, TR } from "@/components/ui/primitives";
 import { DateText, MetricCard, Money, Progress, Tabs } from "@/components/ui/display";
@@ -50,7 +50,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: P
   const today = await agencyToday(db);
   // Signals are recalculated from source records when stale (job also runs every 15 min).
   const last = await lastSignalRefresh(db);
-  if (!last || Date.now() - last.getTime() > 2 * 60 * 1000) {
+  if (!last || nowMs() - last.getTime() > 2 * 60 * 1000) {
     await db.transaction((tx) => refreshSignals(tx));
   }
   const activeSignals = await db.select({ n: sql<number>`count(*)` }).from(signals).where(sql`${signals.status} = 'active'`);

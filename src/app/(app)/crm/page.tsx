@@ -10,7 +10,7 @@ import { crmLookups } from "@/server/crm/lookups";
 import { getRate } from "@/server/finance/ledger";
 import { agencyToday, getSettings } from "@/server/system/settings";
 import { d, Decimal } from "@/lib/money";
-import { addDaysISO } from "@/lib/dates";
+import { addDaysISO, nowMs } from "@/lib/dates";
 import { Badge, Card, CardHeader, EmptyState, LinkButton, Notice, PageHeader, Table, TD, TH, THead, TR } from "@/components/ui/primitives";
 import { DateText, MetricCard, Money } from "@/components/ui/display";
 import { FilterBar } from "@/components/ui/filter-bar";
@@ -61,7 +61,7 @@ export default async function CrmOverviewPage({ searchParams }: { searchParams: 
     byStage.set(r.stage.id, g);
   }
   const noNext = open.filter((r) => !r.o.nextAction || !r.o.nextActionDate || r.o.nextActionDate < today);
-  const stale = open.filter((r) => Date.now() - r.o.stageEnteredAt.getTime() > (r.stage.staleAfterDays ?? settings.staleOpportunityDays) * 86400000);
+  const stale = open.filter((r) => nowMs() - r.o.stageEnteredAt.getTime() > (r.stage.staleAfterDays ?? settings.staleOpportunityDays) * 86400000);
 
   const awaiting = await db
     .select({ p: proposals, accountName: accounts.name })

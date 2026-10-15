@@ -33,36 +33,15 @@ async function Proposals() {
   const rows = await db.select().from(proposalTemplates).orderBy(asc(proposalTemplates.name));
   const svcs = await db.select({ value: services.id, label: services.name }).from(services).orderBy(services.sortOrder);
   const ofs = await db.select({ value: offers.id, label: offers.name }).from(offers).orderBy(offers.name);
-  const Form = ({ t }: { t?: typeof proposalTemplates.$inferSelect }) => (
-    <ActionForm action={saveProposalTemplateAction} resetOnSuccess={!t}>
-      {t ? <input type="hidden" name="id" value={t.id} /> : null}
-      <FormGrid cols={4}>
-        <Field label="Name"><Input name="name" defaultValue={t?.name} required /></Field>
-        <Field label="Service"><Select name="serviceId" options={svcs} placeholder="Any" defaultValue={t?.serviceId ?? ""} /></Field>
-        <Field label="Offer"><Select name="offerId" options={ofs} placeholder="Any" defaultValue={t?.offerId ?? ""} /></Field>
-        <Field label="Pricing model"><Select name="pricingModel" options={[{ value: "fixed", label: "Fixed" }, { value: "retainer", label: "Retainer" }, { value: "milestone", label: "Milestones" }, { value: "hourly", label: "Hourly" }]} placeholder="—" defaultValue={t?.pricingModel ?? ""} /></Field>
-      </FormGrid>
-      <FormGrid cols={2} className="mt-2">
-        <Field label="Introduction"><Textarea name="introduction" rows={3} defaultValue={t?.introduction ?? ""} /></Field>
-        <Field label="Scope"><Textarea name="scope" rows={3} defaultValue={t?.scope ?? ""} /></Field>
-        <Field label="Deliverables (one per line)"><Textarea name="deliverablesText" rows={3} defaultValue={(t?.deliverables ?? []).map((d) => d.name).join("\n")} /></Field>
-        <Field label="Timeline"><Textarea name="timeline" rows={3} defaultValue={t?.timeline ?? ""} /></Field>
-        <Field label="Exclusions"><Textarea name="exclusions" rows={2} defaultValue={t?.exclusions ?? ""} /></Field>
-        <Field label="Assumptions"><Textarea name="assumptions" rows={2} defaultValue={t?.assumptions ?? ""} /></Field>
-      </FormGrid>
-      <Field label="Terms" className="mt-2"><Textarea name="terms" rows={3} defaultValue={t?.terms ?? ""} /></Field>
-      <div className="mt-2 flex items-center justify-between"><Checkbox name="active" label="Active" defaultChecked={t?.active ?? true} /><SubmitButton size="sm">{t ? "Save template" : "Add template"}</SubmitButton></div>
-    </ActionForm>
-  );
   return (
     <>
       {rows.length ? rows.map((t) => (
         <Card key={t.id}>
           <CardHeader title={<span className="flex items-center gap-2">{t.name}{!t.active ? <Badge>inactive</Badge> : null}</span>} description={`${svcs.find((s) => s.value === t.serviceId)?.label ?? "Any service"} · ${(t.deliverables ?? []).length} deliverable(s)`} />
-          <CardBody><details><summary className="cursor-pointer text-[13px] text-accent">Edit</summary><div className="mt-2"><Form t={t} /></div></details></CardBody>
+          <CardBody><details><summary className="cursor-pointer text-[13px] text-accent">Edit</summary><div className="mt-2"><ProposalTemplateForm svcs={svcs} ofs={ofs} t={t} /></div></details></CardBody>
         </Card>
       )) : <Card><EmptyState title="No proposal templates" /></Card>}
-      <Card><CardHeader title="New proposal template" description="Prices are not part of templates — they come from the opportunity and are reviewed on each proposal." /><CardBody><Form /></CardBody></Card>
+      <Card><CardHeader title="New proposal template" description="Prices are not part of templates — they come from the opportunity and are reviewed on each proposal." /><CardBody><ProposalTemplateForm svcs={svcs} ofs={ofs} /></CardBody></Card>
     </>
   );
 }
@@ -93,4 +72,28 @@ function Workspace() {
       ))}
     </>
   );
+}
+
+function ProposalTemplateForm({ t, svcs, ofs }: { t?: typeof proposalTemplates.$inferSelect; svcs: { value: string; label: string }[]; ofs: { value: string; label: string }[] }) {
+  return (
+  <ActionForm action={saveProposalTemplateAction} resetOnSuccess={!t}>
+    {t ? <input type="hidden" name="id" value={t.id} /> : null}
+    <FormGrid cols={4}>
+      <Field label="Name"><Input name="name" defaultValue={t?.name} required /></Field>
+      <Field label="Service"><Select name="serviceId" options={svcs} placeholder="Any" defaultValue={t?.serviceId ?? ""} /></Field>
+      <Field label="Offer"><Select name="offerId" options={ofs} placeholder="Any" defaultValue={t?.offerId ?? ""} /></Field>
+      <Field label="Pricing model"><Select name="pricingModel" options={[{ value: "fixed", label: "Fixed" }, { value: "retainer", label: "Retainer" }, { value: "milestone", label: "Milestones" }, { value: "hourly", label: "Hourly" }]} placeholder="—" defaultValue={t?.pricingModel ?? ""} /></Field>
+    </FormGrid>
+    <FormGrid cols={2} className="mt-2">
+      <Field label="Introduction"><Textarea name="introduction" rows={3} defaultValue={t?.introduction ?? ""} /></Field>
+      <Field label="Scope"><Textarea name="scope" rows={3} defaultValue={t?.scope ?? ""} /></Field>
+      <Field label="Deliverables (one per line)"><Textarea name="deliverablesText" rows={3} defaultValue={(t?.deliverables ?? []).map((d) => d.name).join("\n")} /></Field>
+      <Field label="Timeline"><Textarea name="timeline" rows={3} defaultValue={t?.timeline ?? ""} /></Field>
+      <Field label="Exclusions"><Textarea name="exclusions" rows={2} defaultValue={t?.exclusions ?? ""} /></Field>
+      <Field label="Assumptions"><Textarea name="assumptions" rows={2} defaultValue={t?.assumptions ?? ""} /></Field>
+    </FormGrid>
+    <Field label="Terms" className="mt-2"><Textarea name="terms" rows={3} defaultValue={t?.terms ?? ""} /></Field>
+    <div className="mt-2 flex items-center justify-between"><Checkbox name="active" label="Active" defaultChecked={t?.active ?? true} /><SubmitButton size="sm">{t ? "Save template" : "Add template"}</SubmitButton></div>
+  </ActionForm>
+);
 }

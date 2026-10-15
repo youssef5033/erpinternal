@@ -11,7 +11,7 @@ import { getDefaultPipeline, getSettings, agencyToday } from "@/server/system/se
 import { getRate } from "@/server/finance/ledger";
 import { qs } from "@/lib/utils";
 import { d, Decimal } from "@/lib/money";
-import { formatDate } from "@/lib/dates";
+import { formatDate, nowMs } from "@/lib/dates";
 import { Badge, Card, CardHeader, EmptyState, LinkButton, Notice, PageHeader, StatusBadge, Table, TD, TH, THead, TR } from "@/components/ui/primitives";
 import { DateText, Money, Tabs } from "@/components/ui/display";
 import { FilterBar } from "@/components/ui/filter-bar";
@@ -126,7 +126,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
               </THead>
               <tbody>
                 {rows.map(({ o, accountName, stage, ownerName, services: sv }) => {
-                  const days = Math.floor((Date.now() - o.stageEnteredAt.getTime()) / 86400000);
+                  const days = Math.floor((nowMs() - o.stageEnteredAt.getTime()) / 86400000);
                   return (
                     <TR key={o.id}>
                       <TD className="min-w-[200px]">

@@ -95,3 +95,8 @@ export function resolvePeriod(period: string | undefined, today: ISODate, fiscal
     }
   }
 }
+
+/** Current epoch milliseconds (request time on the server). */
+export function nowMs() {
+  return Date.now();
+}

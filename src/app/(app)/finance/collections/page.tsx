@@ -52,37 +52,11 @@ async function Receivables({ actor, today }: { actor: Awaited<ReturnType<typeof 
     from tasks t where t.invoice_id is not null order by t.invoice_id, coalesce(t.completed_at, t.created_at) desc`)).rows;
   const overdue = rows.filter((r) => r.invoice.dueDate && r.invoice.dueDate < today).sort((a, b) => (a.invoice.dueDate ?? "").localeCompare(b.invoice.dueDate ?? ""));
   const upcoming = rows.filter((r) => !r.invoice.dueDate || r.invoice.dueDate >= today);
-  const Section = ({ list, title, desc }: { list: typeof rows; title: string; desc: string }) => (
-    <Card>
-      <CardHeader title={title} description={desc} />
-      {list.length ? (
-        <Table>
-          <THead><tr><TH>Invoice</TH><TH>Client</TH><TH>Due</TH><TH align="right">Outstanding</TH><TH>Last follow-up</TH><TH /></tr></THead>
-          <tbody>
-            {list.map(({ invoice: i, accountName, outstanding }) => {
-              const f = lastFollowUp.find((x) => x.invoice_id === i.id);
-              const late = daysOverdue(i.dueDate, today);
-              return (
-                <TR key={i.id}>
-                  <TD><Link className="font-medium hover:underline" href={`/finance/invoices/${i.id}`}>{i.number}</Link></TD>
-                  <TD><Link className="hover:underline" href={`/crm/accounts/${i.accountId}?tab=financials`}>{accountName}</Link></TD>
-                  <TD><DateText value={i.dueDate} overdue={late > 0} />{late > 0 ? <div className="text-[11.5px] text-danger">{late} days late</div> : null}</TD>
-                  <TD align="right"><Money value={outstanding} currency={i.currency} />{Number(outstanding) < Number(i.total) ? <div className="text-[11.5px] text-muted">of <Money value={i.total} currency={i.currency} /></div> : null}</TD>
-                  <TD className="text-[12.5px]">{f ? <>{f.subject}<div className="text-muted"><DateText value={f.at.slice(0, 10)} /></div></> : late > 0 ? <Badge tone="warning">none recorded</Badge> : "—"}</TD>
-                  <TD align="right"><Link className="text-[12.5px] text-accent hover:underline" href={`/finance/invoices/${i.id}`}>Follow up</Link></TD>
-                </TR>
-              );
-            })}
-          </tbody>
-        </Table>
-      ) : <EmptyState title="Nothing here" />}
-    </Card>
-  );
   return (
     <div className="space-y-4">
       <Notice>Reminders are not emailed by the system. Log each follow-up as a task or activity on the invoice so the history is visible here.</Notice>
-      <Section list={overdue} title={`Overdue (${overdue.length})`} desc="Issued invoices past their due date with a balance, oldest first." />
-      <Section list={upcoming} title={`Not yet due (${upcoming.length})`} desc="Issued invoices with a balance that are not yet due." />
+      <ReceivableSection today={today} lastFollowUp={lastFollowUp} list={overdue} title={`Overdue (${overdue.length})`} desc="Issued invoices past their due date with a balance, oldest first." />
+      <ReceivableSection today={today} lastFollowUp={lastFollowUp} list={upcoming} title={`Not yet due (${upcoming.length})`} desc="Issued invoices with a balance that are not yet due." />
     </div>
   );
 }
@@ -199,4 +173,33 @@ async function Record({ sp, today }: { sp: Record<string, string | undefined>; t
       ) : null}
     </div>
   );
+}
+
+function ReceivableSection({ list, title, desc, today, lastFollowUp }: { list: Awaited<ReturnType<typeof listInvoicesWithBalances>>; title: string; desc: string; today: string; lastFollowUp: { invoice_id: string; at: string; subject: string }[] }) {
+  return (
+  <Card>
+    <CardHeader title={title} description={desc} />
+    {list.length ? (
+      <Table>
+        <THead><tr><TH>Invoice</TH><TH>Client</TH><TH>Due</TH><TH align="right">Outstanding</TH><TH>Last follow-up</TH><TH /></tr></THead>
+        <tbody>
+          {list.map(({ invoice: i, accountName, outstanding }) => {
+            const f = lastFollowUp.find((x) => x.invoice_id === i.id);
+            const late = daysOverdue(i.dueDate, today);
+            return (
+              <TR key={i.id}>
+                <TD><Link className="font-medium hover:underline" href={`/finance/invoices/${i.id}`}>{i.number}</Link></TD>
+                <TD><Link className="hover:underline" href={`/crm/accounts/${i.accountId}?tab=financials`}>{accountName}</Link></TD>
+                <TD><DateText value={i.dueDate} overdue={late > 0} />{late > 0 ? <div className="text-[11.5px] text-danger">{late} days late</div> : null}</TD>
+                <TD align="right"><Money value={outstanding} currency={i.currency} />{Number(outstanding) < Number(i.total) ? <div className="text-[11.5px] text-muted">of <Money value={i.total} currency={i.currency} /></div> : null}</TD>
+                <TD className="text-[12.5px]">{f ? <>{f.subject}<div className="text-muted"><DateText value={f.at.slice(0, 10)} /></div></> : late > 0 ? <Badge tone="warning">none recorded</Badge> : "—"}</TD>
+                <TD align="right"><Link className="text-[12.5px] text-accent hover:underline" href={`/finance/invoices/${i.id}`}>Follow up</Link></TD>
+              </TR>
+            );
+          })}
+        </tbody>
+      </Table>
+    ) : <EmptyState title="Nothing here" />}
+  </Card>
+);
 }

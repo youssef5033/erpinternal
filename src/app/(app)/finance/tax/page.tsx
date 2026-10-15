@@ -40,7 +40,7 @@ export default async function TaxPage({ searchParams }: { searchParams: Promise<
   return (
     <>
       <PageHeader crumbs={[{ label: "Finance" }, { label: "Tax & compliance" }]} title="Tax & compliance" description="Configurable tax rates, a tax summary from the ledger, and a tracker for filings made outside this system." />
-      <Notice tone="warning" className="mb-4" title="No jurisdiction is assumed">This system does not file returns or claim compliance with any tax authority's rules. Figures are a ledger summary to help your accountant prepare filings; confirm treatment, rates and deadlines with a qualified adviser.</Notice>
+      <Notice tone="warning" className="mb-4" title="No jurisdiction is assumed">This system does not file returns or claim compliance with any tax authority&rsquo;s rules. Figures are a ledger summary to help your accountant prepare filings; confirm treatment, rates and deadlines with a qualified adviser.</Notice>
       <FilterBar fields={[{ type: "select", name: "period", label: "Period", options: PERIOD_OPTIONS, allLabel: "This quarter" }, { type: "date", name: "from", label: "From" }, { type: "date", name: "to", label: "To" }]} />
       <Card className="mb-4 max-w-3xl">
         <CardHeader title={`Tax summary — ${p.label}`} description={`${p.from} → ${p.to}, ${s.baseCurrency}, from posted movements on the output and input tax accounts (issue/approval date basis).`} />
