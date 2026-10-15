@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { f } from "@/lib/formdata";
-import { budgetLines, forecastAdjustments, forecastScenarios, ledgerAccounts, taxRates } from "@/db/schema";
+import { budgetLines, forecastAdjustments, forecastScenarios, ledgerAccounts, taxFilingPeriods, taxRates } from "@/db/schema";
 import { d, Decimal } from "@/lib/money";
 import { runAction, type ActionState } from "./run";
 import { audit } from "../audit";
@@ -493,6 +493,28 @@ export async function budgetAction(_p: ActionState, fd: FormData) {
       }
       await audit(tx, actor, { action: "budget.set", entityType: "budget", entityId: null, summary: `FY${data.fiscalYear} budget ${data.annualAmount} for account ${data.ledgerAccountId}` });
       return "Budget saved (spread evenly across 12 months).";
+    },
+  });
+}
+
+/* ---------------- Tax filing tracker ---------------- */
+
+export async function taxFilingAction(_p: ActionState, fd: FormData) {
+  return runAction(fd, {
+    permission: "finance.admin",
+    action: "tax_filing.save",
+    schema: z.object({ id: f.optId(), name: f.optStr(200), taxType: f.optStr(100), periodStart: f.optDate(), periodEnd: f.optDate(), dueDate: f.optDate(), status: f.enumOf(["open", "in_preparation", "filed_externally", "not_required"] as const), filedReference: f.optStr(200), notes: f.text(), ownerId: f.userId() }),
+    run: async ({ actor, tx, data }) => {
+      if (data.status === "filed_externally" && !data.filedReference) throw new ValidationError("Record the filing reference or confirmation from the authority's system.", { filedReference: "Required" });
+      if (data.id) {
+        await tx.update(taxFilingPeriods).set({ status: data.status, filedReference: data.filedReference, notes: data.notes, ...(data.ownerId ? { ownerId: data.ownerId } : {}) }).where(eq(taxFilingPeriods.id, data.id));
+        await audit(tx, actor, { action: "tax_filing.updated", entityType: "tax_filing_period", entityId: data.id, summary: `Status ${data.status}${data.filedReference ? ` (${data.filedReference})` : ""}` });
+        return "Filing period updated.";
+      }
+      if (!data.name || !data.taxType || !data.periodStart || !data.periodEnd || !data.dueDate) throw new ValidationError("Name, tax type, period and due date are required.");
+      const [row] = await tx.insert(taxFilingPeriods).values({ name: data.name, taxType: data.taxType, periodStart: data.periodStart, periodEnd: data.periodEnd, dueDate: data.dueDate, status: data.status, notes: data.notes, ownerId: data.ownerId }).returning();
+      await audit(tx, actor, { action: "tax_filing.created", entityType: "tax_filing_period", entityId: row.id, summary: `${row.name} due ${row.dueDate}` });
+      return "Filing period added to the tracker.";
     },
   });
 }
