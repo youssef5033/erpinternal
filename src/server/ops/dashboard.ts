@@ -608,10 +608,10 @@ export async function systemHealth(tx: Tx) {
   const [draftsOld] = await tx.select({ n: sql<number>`count(*)` }).from(invoices).where(and(eq(invoices.status, "draft"), lt(invoices.createdAt, new Date(Date.now() - 14 * 86400000))));
   const [unlinkedPeople] = await tx.select({ n: sql<number>`count(*)` }).from(people).where(and(eq(people.status, "active"), isNull(people.userId)));
   const dataQuality = [
-    { key: "missing_cost_rates", label: "Approved time without a cost rate", count: Number(missingCost.n), href: "/people/directory", detail: "Margins exclude these hours until a cost rate covers the work date." },
+    { key: "missing_cost_rates", label: "Approved time without a cost rate", count: Number(missingCost.n), href: "/people", detail: "Margins exclude these hours until a cost rate covers the work date." },
     { key: "active_no_billing", label: "Active clients without billing contact details", count: Number(noBilling.n), href: "/operations?tab=setup" },
     { key: "stale_drafts", label: "Draft invoices older than 14 days", count: Number(draftsOld.n), href: "/finance/invoices?status=draft" },
-    { key: "people_without_login", label: "Active people without a user login", count: Number(unlinkedPeople.n), href: "/people/directory", detail: "They cannot log time or own tasks." },
+    { key: "people_without_login", label: "Active people without a user login", count: Number(unlinkedPeople.n), href: "/people", detail: "They cannot log time or own tasks." },
   ];
   return { integrations: ints, failedSyncs, jobs: jobs.rows, imports, dataQuality };
 }
