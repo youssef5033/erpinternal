@@ -65,6 +65,8 @@ export async function runAction<S extends z.ZodType>(
     console.error(`[action ${opts.action}] error ref=${ref}`, err);
     return { ok: false, message: `Something went wrong. Nothing was saved. (Reference ${ref})`, at: Date.now() };
   }
+  // Internal app: refresh all server-rendered data after any successful mutation.
+  revalidatePath("/", "layout");
   for (const p of opts.revalidate ?? []) revalidatePath(p);
   if (duplicateRef !== undefined) {
     return { ok: true, message: "Already submitted — your earlier submission was kept.", ref: duplicateRef, at: Date.now() };
