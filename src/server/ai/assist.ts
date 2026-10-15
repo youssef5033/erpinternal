@@ -14,7 +14,7 @@ import { aiApiKey } from "../system/admin";
  * automatically. The model only sees facts recorded in the system and is told
  * not to invent contact details, budgets, replies, claims or commitments.
  */
-export const AI_MODEL = "claude-opus-5-5";
+export const AI_MODEL = process.env.AI_MODEL || "claude-opus-5-5";
 
 const SYSTEM = `You help staff at a professional-services agency draft internal working text.
 Rules you must follow:
