@@ -412,3 +412,12 @@ export async function generateDueBillingInvoices(tx: Tx, actor: Actor, asOf: str
 export async function invoiceAllocations(tx: Tx, invoiceId: string) {
   return tx.select().from(paymentAllocations).where(eq(paymentAllocations.invoiceId, invoiceId));
 }
+
+/** Payment status from the outstanding balance alone (list views). Credits count as settlement. */
+export function statusFromOutstanding(inv: { status: string; total: string }, outstanding: string): InvoicePaymentStatus {
+  if (inv.status === "draft") return "draft";
+  if (inv.status === "void") return "void";
+  if (d(outstanding).lessThanOrEqualTo(0)) return "paid";
+  if (d(outstanding).lessThan(d(inv.total))) return "partially_paid";
+  return "unpaid";
+}
