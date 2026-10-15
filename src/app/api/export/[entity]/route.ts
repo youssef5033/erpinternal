@@ -52,10 +52,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ entity: string 
         .from(timeEntries)
         .innerJoin(people, eq(people.id, timeEntries.personId));
       break;
-    case "journal":
+    case "journal": {
+      const u = new URL(req.url);
+      const from = /^\d{4}-\d{2}-\d{2}$/.test(u.searchParams.get("from") ?? "") ? u.searchParams.get("from") : null;
+      const to = /^\d{4}-\d{2}-\d{2}$/.test(u.searchParams.get("to") ?? "") ? u.searchParams.get("to") : null;
       if (!can(actor, "finance.export")) return deny();
-      rows = await db.select({ entry: journalEntries.number, date: journalEntries.entryDate, memo: journalEntries.memo, source: journalEntries.sourceType, account: sql<string>`${ledgerAccounts.code} || ' ' || ${ledgerAccounts.name}`, debit: journalLines.debit, credit: journalLines.credit, currency: journalLines.txnCurrency, txnAmount: journalLines.txnAmount, rate: journalLines.exchangeRate }).from(journalLines).innerJoin(journalEntries, eq(journalEntries.id, journalLines.entryId)).innerJoin(ledgerAccounts, eq(ledgerAccounts.id, journalLines.ledgerAccountId)).orderBy(journalEntries.entryDate, journalEntries.number);
+      rows = await db.select({ entry: journalEntries.number, date: journalEntries.entryDate, memo: journalEntries.memo, source: journalEntries.sourceType, account: sql<string>`${ledgerAccounts.code} || ' ' || ${ledgerAccounts.name}`, debit: journalLines.debit, credit: journalLines.credit, currency: journalLines.txnCurrency, txnAmount: journalLines.txnAmount, rate: journalLines.exchangeRate }).from(journalLines).innerJoin(journalEntries, eq(journalEntries.id, journalLines.entryId)).innerJoin(ledgerAccounts, eq(ledgerAccounts.id, journalLines.ledgerAccountId)).where(and(from ? sql`${journalEntries.entryDate} >= ${from}` : undefined, to ? sql`${journalEntries.entryDate} <= ${to}` : undefined)).orderBy(journalEntries.entryDate, journalEntries.number);
       break;
+    }
     default:
       return NextResponse.json({ error: "Unknown export" }, { status: 404 });
   }

@@ -3,7 +3,8 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { f } from "@/lib/formdata";
-import { forecastAdjustments, forecastScenarios, ledgerAccounts, taxRates } from "@/db/schema";
+import { budgetLines, forecastAdjustments, forecastScenarios, ledgerAccounts, taxRates } from "@/db/schema";
+import { d, Decimal } from "@/lib/money";
 import { runAction, type ActionState } from "./run";
 import { audit } from "../audit";
 import { assertCan } from "../auth/actor";
@@ -28,7 +29,7 @@ import {
 } from "../finance/bank";
 import { addExchangeRate, lockPeriod, postManualJournal, reverseManualJournal } from "../finance/ledger";
 import { runRecurringSchedules, saveRecurringSchedule, setRecurringStatus } from "../finance/recurring";
-import { agencyToday } from "../system/settings";
+import { agencyToday, getSettings } from "../system/settings";
 
 /* ---------------- Invoices ---------------- */
 
@@ -471,6 +472,27 @@ export async function forecastScenarioAction(_p: ActionState, fd: FormData) {
       await tx.insert(forecastScenarios).values({ ...data, name: names[data.key] }).onConflictDoUpdate({ target: forecastScenarios.key, set: { collectionDelayDays: data.collectionDelayDays, collectionRatePercent: data.collectionRatePercent, pipelineInclusionPercent: data.pipelineInclusionPercent, expenseMultiplierPercent: data.expenseMultiplierPercent, notes: data.notes } });
       await audit(tx, actor, { action: "forecast.scenario_updated", entityType: "forecast_scenario", entityId: null, summary: `${data.key}: delay ${data.collectionDelayDays}d, collect ${data.collectionRatePercent}%, pipeline ${data.pipelineInclusionPercent}%, costs ${data.expenseMultiplierPercent}%` });
       return "Scenario assumptions saved.";
+    },
+  });
+}
+
+/* ---------------- Budgets ---------------- */
+
+export async function budgetAction(_p: ActionState, fd: FormData) {
+  return runAction(fd, {
+    permission: "finance.admin",
+    action: "budget.set",
+    schema: z.object({ fiscalYear: f.int(), ledgerAccountId: f.id(), annualAmount: f.money(), note: f.optStr(500) }),
+    run: async ({ actor, tx, data }) => {
+      const s = await getSettings(tx);
+      const total = d(data.annualAmount);
+      const monthly = total.div(12).toDecimalPlaces(2, Decimal.ROUND_DOWN);
+      for (let m = 1; m <= 12; m++) {
+        const amount = m === 12 ? total.minus(monthly.times(11)).toFixed(2) : monthly.toFixed(2);
+        await tx.insert(budgetLines).values({ fiscalYear: data.fiscalYear, month: m, ledgerAccountId: data.ledgerAccountId, amount, currency: s.baseCurrency, note: data.note }).onConflictDoUpdate({ target: [budgetLines.fiscalYear, budgetLines.month, budgetLines.ledgerAccountId], set: { amount, note: data.note } });
+      }
+      await audit(tx, actor, { action: "budget.set", entityType: "budget", entityId: null, summary: `FY${data.fiscalYear} budget ${data.annualAmount} for account ${data.ledgerAccountId}` });
+      return "Budget saved (spread evenly across 12 months).";
     },
   });
 }
