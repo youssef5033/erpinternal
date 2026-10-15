@@ -88,7 +88,7 @@ export async function cashForecast(tx: Tx, scenarioKey: ForecastScenarioKey = "b
   const reimb = await tx.select().from(expenses).where(and(eq(expenses.status, "approved"), eq(expenses.paidFrom, "personal")));
   for (const e of reimb) {
     const amt = d(e.amount).plus(d(e.taxAmount)).negated();
-    movements.push({ week: weeks[0], kind: "reimbursement", label: `Reimburse ${e.number}`, href: `/finance/expenses/${e.id}`, amount: amt.toFixed(2), currency: e.currency, baseAmount: (await convert(amt, e.currency)).toFixed(2), assumption: "Approved, reimbursed this week" });
+    movements.push({ week: weeks[0], kind: "reimbursement", label: `Reimburse ${e.number}`, href: `/finance/bills/expenses/${e.id}`, amount: amt.toFixed(2), currency: e.currency, baseAmount: (await convert(amt, e.currency)).toFixed(2), assumption: "Approved, reimbursed this week" });
   }
   // Manual assumptions (payroll, rent, taxes, owner draws...).
   const adj = await tx.select().from(forecastAdjustments).where(inArray(forecastAdjustments.scenarioKey, ["all", scenarioKey]));

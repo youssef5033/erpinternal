@@ -7,6 +7,7 @@ import { assertCan, type Actor } from "../auth/actor";
 import { ALL_PERMISSIONS, type Permission, type Scope } from "../auth/permissions";
 import { audit, diff } from "../audit";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
+import { pingProvider } from "../ai/assist";
 import { credentialsKeyConfigured, decryptSecret, encryptSecret, secretHint } from "../crypto";
 
 /* ------------------------------------------------------------------ */
@@ -245,15 +246,7 @@ export async function verifyAi(tx: Tx, actor: Actor) {
   const k = await aiApiKey(tx);
   const base = { kind: "ai" as const, provider: "anthropic", displayName: "Anthropic Claude" };
   if (!k) throw new ValidationError("No AI key is configured (stored credential or ANTHROPIC_API_KEY).");
-  let ok = false;
-  let error: string | null = null;
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/models?limit=1", { headers: { "x-api-key": k.key, "anthropic-version": "2023-06-01" }, signal: AbortSignal.timeout(10000) });
-    ok = res.ok;
-    if (!ok) error = `Provider returned HTTP ${res.status}${res.status === 401 ? " (invalid key)" : ""}`;
-  } catch (e) {
-    error = `Could not reach the provider: ${e instanceof Error ? e.message : "network error"}`;
-  }
+  const { ok, error } = await pingProvider(k.key);
   const now = new Date();
   const set = ok ? { status: "connected" as const, verifiedAt: now, lastSuccessAt: now, lastError: null } : { status: "error" as const, lastErrorAt: now, lastError: error };
   await tx.insert(integrations).values({ ...base, ...set, credentialHint: k.source === "env" ? "from server environment" : undefined }).onConflictDoUpdate({ target: [integrations.kind, integrations.provider], set: { ...set, updatedAt: now } });

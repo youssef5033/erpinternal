@@ -247,11 +247,11 @@ export async function myDay(tx: Tx, actor: Actor, f: MyDayFilters) {
     const bs = await tx.select().from(bills).where(eq(bills.status, "awaiting_approval"));
     for (const b of bs) items.push(approval(`bill:${b.id}`, `Approve bill ${b.number} (${b.currency} ${b.total})`, { type: "bill", label: b.number, href: `/finance/bills/${b.id}` }, null, b.dueDate, "Check the bill and approve or return"));
     const es = await tx.select().from(expenses).where(eq(expenses.status, "submitted"));
-    for (const e of es) items.push(approval(`expense:${e.id}`, `Approve expense ${e.number}: ${e.description}`, { type: "expense", label: `${e.number}${e.exceedsThreshold ? " · over threshold" : ""}`, href: `/finance/expenses/${e.id}` }, e.submittedBy, null, "Approve or reject"));
+    for (const e of es) items.push(approval(`expense:${e.id}`, `Approve expense ${e.number}: ${e.description}`, { type: "expense", label: `${e.number}${e.exceedsThreshold ? " · over threshold" : ""}`, href: `/finance/bills/expenses/${e.id}` }, e.submittedBy, null, "Approve or reject"));
   }
   if (can(actor, "time.approve")) {
     const pending = await tx.select({ n: sql<number>`count(*)`, h: sql<string>`sum(${timeEntries.hours})` }).from(timeEntries).where(eq(timeEntries.status, "submitted"));
-    if (Number(pending[0].n) > 0) items.push(approval("time:pending", `Review ${pending[0].n} submitted time entries (${d(pending[0].h).toFixed(1)}h)`, { type: "timesheet", label: "Timesheets", href: "/people/timesheets?status=submitted" }, null, null, "Approve or reject timesheets"));
+    if (Number(pending[0].n) > 0) items.push(approval("time:pending", `Review ${pending[0].n} submitted time entries (${d(pending[0].h).toFixed(1)}h)`, { type: "timesheet", label: "Timesheets", href: "/people/timesheets?tab=approvals" }, null, null, "Approve or reject timesheets"));
   }
   if (can(actor, "delivery.approve")) {
     const crs = await tx.select({ c: changeRequests, e: engagements }).from(changeRequests).innerJoin(engagements, eq(engagements.id, changeRequests.engagementId)).where(and(eq(changeRequests.status, "submitted"), ownerId ? eq(engagements.ownerId, ownerId) : undefined));
@@ -323,15 +323,15 @@ export async function numbersAndEvidence(tx: Tx, actor: Actor, range: { from: st
   if (can(actor, "reports.read")) {
     const pl = await profitAndLoss(tx, range.from, range.to);
     const expensesTotal = d(pl.totalDirectCosts).plus(d(pl.totalOverhead));
-    metrics.push({ key: "revenue", label: "Recognised revenue", value: pl.totalRevenue, currency: base, basis: "Posted revenue-account credits less debits dated in the period (accrual). Excludes invoiced-but-unearned amounts held in deferred revenue.", range: rangeLabel, href: `/finance/reports/pnl?${q}`, detail: pl.revenue.map((l) => ({ label: l.account.name, value: l.amount, currency: base, href: `/finance/reports/ledger?account=${l.account.id}&${q}` })) });
-    metrics.push({ key: "expenses", label: "Expenses", value: expensesTotal.toFixed(2), currency: base, basis: "Approved bills and expenses posted to expense accounts in the period (direct costs + overhead).", range: rangeLabel, href: `/finance/reports/pnl?${q}`, detail: [{ label: "Direct costs", value: pl.totalDirectCosts, currency: base }, { label: "Overhead", value: pl.totalOverhead, currency: base }] });
-    metrics.push({ key: "net_profit", label: "Management P&L — net profit", value: pl.netProfit, currency: base, basis: `Revenue − direct costs − overhead + other income. Gross margin ${pl.grossMarginPct ?? "n/a"}%.`, range: rangeLabel, href: `/finance/reports/pnl?${q}` });
+    metrics.push({ key: "revenue", label: "Recognised revenue", value: pl.totalRevenue, currency: base, basis: "Posted revenue-account credits less debits dated in the period (accrual). Excludes invoiced-but-unearned amounts held in deferred revenue.", range: rangeLabel, href: `/finance/reports?report=pnl&${q}`, detail: pl.revenue.map((l) => ({ label: l.account.name, value: l.amount, currency: base, href: `/finance/reports?report=ledger&account=${l.account.id}&${q}` })) });
+    metrics.push({ key: "expenses", label: "Expenses", value: expensesTotal.toFixed(2), currency: base, basis: "Approved bills and expenses posted to expense accounts in the period (direct costs + overhead).", range: rangeLabel, href: `/finance/reports?report=pnl&${q}`, detail: [{ label: "Direct costs", value: pl.totalDirectCosts, currency: base }, { label: "Overhead", value: pl.totalOverhead, currency: base }] });
+    metrics.push({ key: "net_profit", label: "Management P&L — net profit", value: pl.netProfit, currency: base, basis: `Revenue − direct costs − overhead + other income. Gross margin ${pl.grossMarginPct ?? "n/a"}%.`, range: rangeLabel, href: `/finance/reports?report=pnl&${q}` });
     const cf = await cashFlowStatement(tx, range.from, range.to);
     const op = cf.sections.find((x) => x.section === "operating");
     const receipts = op?.items.find((i) => i.label.startsWith("Receipts"))?.amount ?? "0.00";
     const paid = (op?.items ?? []).filter((i) => !i.label.startsWith("Receipts")).reduce((a, i) => a.plus(d(i.amount)), new Decimal(0));
-    metrics.push({ key: "cash_received", label: "Cash received", value: receipts, currency: base, basis: "Customer receipts posted to bank/cash accounts in the period (date of receipt).", range: rangeLabel, href: `/finance/payments?${q}` });
-    metrics.push({ key: "cash_paid", label: "Cash paid", value: paid.abs().toFixed(2), currency: base, basis: "Supplier payments, company-paid expenses, reimbursements and categorised bank outflows in the period.", range: rangeLabel, href: `/finance/reports/cash-flow?${q}` });
+    metrics.push({ key: "cash_received", label: "Cash received", value: receipts, currency: base, basis: "Customer receipts posted to bank/cash accounts in the period (date of receipt).", range: rangeLabel, href: `/finance/collections?tab=payments` });
+    metrics.push({ key: "cash_paid", label: "Cash paid", value: paid.abs().toFixed(2), currency: base, basis: "Supplier payments, company-paid expenses, reimbursements and categorised bank outflows in the period.", range: rangeLabel, href: `/finance/reports?report=cash-flow&${q}` });
   } else {
     metrics.push({ key: "revenue", label: "Recognised revenue", value: null, currency: base, basis: "", range: rangeLabel, href: "#", unavailableReason: "Requires the reports.read permission." });
   }
@@ -354,7 +354,7 @@ export async function numbersAndEvidence(tx: Tx, actor: Actor, range: { from: st
     const up = new Map<string, Decimal>();
     for (const b of upcoming) if (d(b.outstanding).greaterThan(0)) up.set(b.currency, (up.get(b.currency) ?? new Decimal(0)).plus(d(b.outstanding)));
     const upList = Array.from(up.entries());
-    metrics.push({ key: "upcoming_payments", label: "Payments due in 14 days", value: upList.length <= 1 ? (upList[0]?.[1] ?? new Decimal(0)).toFixed(2) : null, currency: upList.length <= 1 ? upList[0]?.[0] ?? base : null, basis: "Approved supplier bills with an outstanding balance due on or before today + 14 days (includes overdue).", range: `${today} → ${addDaysISO(today, 14)}`, href: "/finance/bills?due=14", detail: upList.map(([c, v]) => ({ label: c, value: v.toFixed(2), currency: c })) });
+    metrics.push({ key: "upcoming_payments", label: "Payments due in 14 days", value: upList.length <= 1 ? (upList[0]?.[1] ?? new Decimal(0)).toFixed(2) : null, currency: upList.length <= 1 ? upList[0]?.[0] ?? base : null, basis: "Approved supplier bills with an outstanding balance due on or before today + 14 days (includes overdue).", range: `${today} → ${addDaysISO(today, 14)}`, href: "/finance/bills?tab=bills&status=open", detail: upList.map(([c, v]) => ({ label: c, value: v.toFixed(2), currency: c })) });
   }
 
   if (can(actor, "finance.read") && can(actor, "reports.read")) {
@@ -575,7 +575,7 @@ export async function setupChecklist(tx: Tx) {
   if (!s.taxIdentifier) issues.push({ key: "taxid", group: "Missing tax or accounting settings", title: "Agency tax identifier not set", detail: "Shown on invoices when configured.", href: "/system/settings" });
   const banks = await tx.select().from(bankAccounts).where(eq(bankAccounts.active, true));
   if (!banks.length) issues.push({ key: "bank", group: "Incomplete financial opening balances", title: "No bank accounts", detail: "Add your bank and cash accounts to record payments and forecast cash.", href: "/finance/bank" });
-  for (const b of banks) if (!b.openingJournalEntryId) issues.push({ key: `ob:${b.id}`, group: "Incomplete financial opening balances", title: `${b.name} has no opening balance`, detail: "Post the balance at your go-live date.", href: `/finance/bank/${b.id}` });
+  for (const b of banks) if (!b.openingJournalEntryId) issues.push({ key: `ob:${b.id}`, group: "Incomplete financial opening balances", title: `${b.name} has no opening balance`, detail: "Post the balance at your go-live date.", href: `/finance/bank?account=${b.id}` });
   if (!s.openingBalancesCompletedAt) issues.push({ key: "ob", group: "Incomplete financial opening balances", title: "Opening balances not confirmed", detail: "Enter opening receivables, payables and equity as manual opening-balance journals, then confirm.", href: "/finance/accounting?tab=opening" });
   // Currencies in use without a rate to base
   const curs = await tx.execute<{ c: string }>(sql`select distinct currency as c from invoices union select distinct currency from opportunities union select distinct currency from bills union select distinct currency from engagements`);

@@ -214,7 +214,7 @@ async function detect(tx: Tx): Promise<DetectedSignal[]> {
           resolutionAction: "Log time for those days (or record leave).",
           entityType: "person",
           entityId: p.id,
-          href: `/people/timesheets?person=${p.id}`,
+          href: `/people/timesheets?tab=approvals&person=${p.id}`,
           ownerId: p.userId,
         });
       }
@@ -238,7 +238,7 @@ async function detect(tx: Tx): Promise<DetectedSignal[]> {
       resolutionAction: "Match each line to its payment, bill or expense, or categorise it.",
       entityType: "bank_account",
       entityId: r.bankAccountId,
-      href: `/finance/bank/${r.bankAccountId}?status=unreconciled`,
+      href: `/finance/bank?account=${r.bankAccountId}`,
       ownerId: null,
     });
   }
@@ -255,7 +255,7 @@ async function detect(tx: Tx): Promise<DetectedSignal[]> {
       resolutionAction: "Approve with justification or reject the expense.",
       entityType: "expense",
       entityId: e.id,
-      href: `/finance/expenses/${e.id}`,
+      href: `/finance/bills/expenses/${e.id}`,
       ownerId: null,
     });
   }

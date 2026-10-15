@@ -1,3 +1,4 @@
+import { AiPanel } from "@/components/ai/ai-panel";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, or, sql } from "drizzle-orm";
@@ -157,6 +158,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
                 </CardBody>
               </Card>
             ) : null}
+            <AiPanel actor={actor} kind="account_summary" entityId={id} title="Relationship summary" description="A summary of recorded activity, engagements and deals for an account review." />
             <AuditPanel actor={actor} entityType="account" entityId={id} />
           </div>
         </div>
@@ -359,7 +361,7 @@ async function FinancialsTab({ accountId, today }: { accountId: string; today: s
         <Card>
           <CardHeader title="Payments received" />
           <ul className="divide-y divide-line">
-            {pays.map((p) => <li key={p.id} className="flex justify-between px-4 py-2 text-[13px]"><Link href={`/finance/payments/${p.id}`} className="hover:underline">{p.number} · {formatDate(p.paymentDate)}{p.status === "reversed" ? " (reversed)" : ""}</Link><Money value={p.amount} currency={p.currency} /></li>)}
+            {pays.map((p) => <li key={p.id} className="flex justify-between px-4 py-2 text-[13px]"><Link href={`/finance/collections?tab=payments&account=${p.accountId}`} className="hover:underline">{p.number} · {formatDate(p.paymentDate)}{p.status === "reversed" ? " (reversed)" : ""}</Link><Money value={p.amount} currency={p.currency} /></li>)}
             {!pays.length ? <li className="px-4 py-3 text-[13px] text-muted">None.</li> : null}
           </ul>
         </Card>

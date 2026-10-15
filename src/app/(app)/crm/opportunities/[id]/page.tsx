@@ -1,3 +1,4 @@
+import { AiPanel } from "@/components/ai/ai-panel";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq } from "drizzle-orm";
@@ -184,6 +185,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
                 </CardBody>
               </Card>
             ) : null}
+            <AiPanel actor={actor} kind="followup_draft" entityId={id} title="Draft a follow-up" description="A first draft of a follow-up email from this opportunity's recorded activity. Copy, edit and send it yourself." />
             <AuditPanel actor={actor} entityType="opportunity" entityId={id} />
           </div>
         </div>

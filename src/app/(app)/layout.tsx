@@ -26,8 +26,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { label: "Task", href: "/people/tasks/new", ok: can(actor, "delivery.write") || can(actor, "crm.write") || can(actor, "finance.write") },
     { label: "Appointment", href: "/operations/calendar/events/new", ok: can(actor, "crm.write") || can(actor, "delivery.write") },
     { label: "Invoice", href: "/finance/invoices/new", ok: can(actor, "finance.write") },
-    { label: "Expense", href: "/finance/expenses/new", ok: can(actor, "expenses.submit") || can(actor, "finance.write") },
-    { label: "Payment received", href: "/finance/payments/new", ok: can(actor, "finance.write") },
+    { label: "Expense", href: "/finance/bills?tab=submit", ok: can(actor, "expenses.submit") || can(actor, "finance.write") },
+    { label: "Payment received", href: "/finance/collections?tab=record", ok: can(actor, "finance.write") },
     { label: "Time entry", href: "/people/timesheets?new=1", ok: can(actor, "time.write") },
   ];
   const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(notifications).where(and(eq(notifications.userId, actor.userId), isNull(notifications.readAt)));
