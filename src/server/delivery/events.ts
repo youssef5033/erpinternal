@@ -7,6 +7,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { logActivity } from "../crm/activities";
 import { moveOpportunityStage } from "../crm/opportunities";
 import { createTask } from "./tasks";
+import { assertEventAccess } from "../auth/scope";
 
 export type EventInput = {
   kind: "meeting" | "call" | "discovery" | "account_review" | "internal" | "workshop";
@@ -87,6 +88,7 @@ export async function scheduleEvent(tx: Tx, actor: Actor, input: EventInput) {
 
 export async function updateEvent(tx: Tx, actor: Actor, id: string, input: EventInput) {
   validate(input);
+  await assertEventAccess(tx, actor, id);
   const [ev] = await tx.select().from(events).where(eq(events.id, id));
   if (!ev) throw new NotFoundError("Event");
   await tx
@@ -103,6 +105,7 @@ export async function completeEvent(
   id: string,
   input: { status: "completed" | "cancelled" | "no_show"; notes?: string | null; decisions?: string | null; outcome?: string | null; followUps?: { title: string; ownerId?: string | null; dueDate?: string | null }[] },
 ) {
+  await assertEventAccess(tx, actor, id);
   const [ev] = await tx.select().from(events).where(eq(events.id, id)).for("update");
   if (!ev) throw new NotFoundError("Event");
   await tx.update(events).set({ status: input.status, notes: input.notes || null, decisions: input.decisions || null, outcome: input.outcome || null }).where(eq(events.id, id));

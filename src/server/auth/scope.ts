@@ -6,6 +6,7 @@ import {
   documents,
   engagementMembers,
   engagements,
+  events,
   invoices,
   leads,
   opportunities,
@@ -77,6 +78,22 @@ export function taskVisibility(actor: Actor): SQL | undefined {
   return or(...conditions);
 }
 
+/**
+ * Calendar events: own (organiser or attendee) always; otherwise events tied to
+ * engagements/CRM records the actor can see.
+ */
+export function eventVisibility(actor: Actor): SQL | undefined {
+  if (canAll(actor, "crm.read") && canAll(actor, "delivery.read")) return undefined;
+  const conds: (SQL | undefined)[] = [
+    eq(events.organizerId, actor.userId),
+    sql`exists (select 1 from event_attendees ea where ea.event_id = "events"."id" and ea.user_id = ${actor.userId})`,
+  ];
+  if (canAll(actor, "delivery.read")) conds.push(sql`"events"."engagement_id" is not null`);
+  else if (can(actor, "delivery.read")) conds.push(sql`"events"."engagement_id" in ${assignedEngagementIdsSql(actor.userId)}`);
+  if (canAll(actor, "crm.read")) conds.push(sql`"events"."engagement_id" is null`);
+  return or(...conds);
+}
+
 export function invoiceVisibility(actor: Actor): SQL | undefined {
   const scope = scopeOf(actor, "finance.read");
   if (scope === "all") return undefined;
@@ -139,4 +156,14 @@ export function assertCrmWrite(actor: Actor, ownerId: string | null | undefined)
   const scope = scopeOf(actor, "crm.write");
   if (!scope) throw new ForbiddenError();
   if (scope === "assigned" && ownerId !== actor.userId) throw new ForbiddenError("You can only change records you own.");
+}
+
+/** Throw unless the calendar event is visible to the actor. */
+export async function assertEventAccess(tx: Tx, actor: Actor, eventId: string) {
+  const [row] = await tx.select({ id: events.id }).from(events).where(and(eq(events.id, eventId), eventVisibility(actor))).limit(1);
+  if (!row) {
+    const [e] = await tx.select({ id: events.id }).from(events).where(eq(events.id, eventId)).limit(1);
+    if (!e) throw new NotFoundError("Event");
+    throw new ForbiddenError("You are not invited to this event.");
+  }
 }
