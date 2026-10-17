@@ -18,11 +18,11 @@
  */
 import "dotenv/config";
 import { count, eq } from "drizzle-orm";
-import { db, pool } from "@/db/client";
-import { runMigrations } from "@/db/migrate";
 import { user } from "@/db/schema";
-import { ensureReferenceData, upsertUser } from "@/server/system/bootstrap";
-import { seedDemo } from "@/server/system/demo-seed";
+
+// Loaded inside main() so connection-setting errors get the plain-language explanation below.
+let db: typeof import("@/db/client").db;
+let pool: typeof import("@/db/client").pool | undefined;
 
 function arg(name: string) {
   const i = process.argv.indexOf(`--${name}`);
@@ -36,6 +36,10 @@ function ownerPassword() {
 }
 
 async function main() {
+  ({ db, pool } = await import("@/db/client"));
+  const { runMigrations } = await import("@/db/migrate");
+  const { ensureReferenceData, upsertUser } = await import("@/server/system/bootstrap");
+  const { seedDemo } = await import("@/server/system/demo-seed");
   await runMigrations(db);
 
   const [{ n }] = await db.select({ n: count() }).from(user);
@@ -45,7 +49,7 @@ async function main() {
       await seedDemo(db);
     } catch (e) {
       // The database was empty when we started: clear the partial seed so the next deploy retries cleanly.
-      const { rows } = await pool.query(`select tablename from pg_tables where schemaname = 'public'`);
+      const { rows } = await pool!.query(`select tablename from pg_tables where schemaname = 'public'`);
       await pool.query(`truncate ${rows.map((r) => `"${r.tablename}"`).join(", ")} restart identity cascade`);
       throw e;
     }
@@ -69,11 +73,34 @@ async function main() {
       console.log(`Owner account created: ${email}`);
     }
   }
-  await pool.end();
+  await pool!.end();
+}
+
+/** Plain-language hint for the connection problems people hit when hosting (never prints secrets). */
+function explain(e: unknown): string | null {
+  // Database libraries wrap the original error (e.g. "Failed query: …", cause: the real error).
+  let err = e as { code?: string; message?: string; cause?: unknown };
+  while (err?.cause && !err.code) err = err.cause as typeof err;
+  const msg = String(err?.message ?? e);
+  const code = err?.code ?? "";
+  if (/without TLS/.test(msg)) return "DATABASE_CA_CERT is empty. Paste the full certificate text from Supabase (Project Settings → Database → SSL Configuration → Download certificate).";
+  if (/self[- ]signed|unable to (get|verify)|certificate/i.test(msg) || code.startsWith("SELF_SIGNED") || code.startsWith("UNABLE_TO") || code === "CERT_HAS_EXPIRED")
+    return "The database certificate could not be verified. Check that DATABASE_CA_CERT contains the complete certificate text, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----, copied from the downloaded .crt file in a plain-text editor.";
+  if (code === "28P01" || /password authentication failed/i.test(msg)) return "Wrong database password in DATABASE_URL. Replace [YOUR-PASSWORD] (including the brackets) with your Supabase database password, or reset it in Project Settings → Database.";
+  if (/tenant or user not found/i.test(msg)) return "Supabase does not recognise the user in DATABASE_URL. Copy the Session pooler string again: the user must look like postgres.<project-id>.";
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") return "The database host name in DATABASE_URL was not found. Copy the Session pooler string again from Supabase → Connect.";
+  if (code === "ECONNREFUSED" || code === "ETIMEDOUT" || code === "ENETUNREACH" || /timeout/i.test(msg))
+    return "Could not reach the database. Use the Session pooler string (host ...pooler.supabase.com, port 5432), not the Direct connection, and check the Supabase project is not paused.";
+  if (code === "ERR_INVALID_URL" || /Invalid URL/i.test(msg)) return "DATABASE_URL is not a valid address. If your password contains characters like @ # / ? %, reset it in Supabase to one with only letters and numbers.";
+  if (/DATABASE_URL is not set/.test(msg)) return "DATABASE_URL is missing in Render → Environment.";
+  if (/OWNER_PASSWORD/.test(msg)) return msg;
+  return null;
 }
 
 main().catch(async (e) => {
   console.error(e);
-  await pool.end();
+  const hint = explain(e);
+  console.error(`\n[setup] FAILED${hint ? `: ${hint}` : " (see the error above)."}\n`);
+  await pool?.end().catch(() => undefined);
   process.exit(1);
 });
