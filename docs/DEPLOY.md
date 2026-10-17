@@ -193,6 +193,7 @@ isn't needed.
 | `APP_ENV` | `demo` or `production`. |
 | `OWNER_EMAIL`, `OWNER_NAME`, `OWNER_PASSWORD` | First Owner account. It's created once and never overwritten. |
 | `BETTER_AUTH_URL` | Public URL. On Render it defaults to the service URL. |
+| `LOW_MEMORY_BUILD` | `true` builds with one worker and skips the in-build type check, which brings peak build memory from about 1.6 GB to about 1.0 GB. Use it only if a build fails with "out of memory"; types are still checked by `npm run typecheck` and the tests. |
 
 **Other hosts.** The app is a standard Node.js 20.9+ service:
 - **build:** `npm ci --include=dev && npm run build`
