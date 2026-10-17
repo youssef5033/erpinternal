@@ -13,6 +13,10 @@ This is internal only. There is no client portal.
   background jobs.
 - **Storage:** private document storage, either local disk or S3-compatible.
 
+**Hosting it in the cloud:** see [`docs/DEPLOY.md`](docs/DEPLOY.md). It
+covers a one-click Render Blueprint with the app, database and document
+storage.
+
 Further docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 [`docs/ACCOUNTING.md`](docs/ACCOUNTING.md),
 [`docs/DEFINITIONS.md`](docs/DEFINITIONS.md),
@@ -62,7 +66,7 @@ npm run worker                  # one worker process
 |---|---|---|
 | `DATABASE_URL` | yes | PostgreSQL connection string. Production and demo **must** use different databases. |
 | `APP_ENV` | yes | `production`, `demo` or `development`. In `demo` the app shows a permanent DEMO banner, and `demo:reset` is allowed. |
-| `BETTER_AUTH_URL` | yes | Public base URL, used for cookies and auth callbacks. |
+| `BETTER_AUTH_URL` | yes* | Public base URL, used for cookies and auth callbacks. *On Render it defaults to the service URL. |
 | `BETTER_AUTH_SECRET` | yes | 32+ random bytes (`openssl rand -base64 32`). Signs sessions. |
 | `CREDENTIALS_ENCRYPTION_KEY` | yes | 32 random bytes, base64. Encrypts integration credentials at rest (AES-256-GCM). Losing it makes stored keys unreadable, so they must be re-entered. |
 | `STORAGE_DRIVER` | no | `local` (default) or `s3`. |
@@ -70,6 +74,9 @@ npm run worker                  # one worker process
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | when `s3` | A private S3-compatible bucket. |
 | `UPLOAD_MAX_MB` | no | Upload size limit. Default 15. |
 | `JOBS_ENABLED` | no | Set to `false` to stop the worker scheduling jobs. |
+| `JOBS_IN_WEB` | no | `true` runs the background jobs inside the web server, so no separate `npm run worker` process is needed. |
+| `S3_SERVER_SIDE_ENCRYPTION` | no | Encryption header sent to S3. On AWS it defaults to `AES256`; with a custom `S3_ENDPOINT` it is not sent. |
+| `OWNER_EMAIL`, `OWNER_NAME`, `OWNER_PASSWORD` | hosted first run | `db:setup` creates this Owner if no user with that email exists yet. It never resets an existing password. |
 | `ANTHROPIC_API_KEY` | no | Optional AI assistance. The app works fully without it. A key can also be stored encrypted from **System → Integrations**. |
 | `AI_MODEL` | no | Model for AI suggestions. Default `claude-opus-5-5`. |
 | `DEMO_PASSWORD` | demo only | Password given to the seeded demo users. |

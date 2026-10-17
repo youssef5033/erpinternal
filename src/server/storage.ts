@@ -58,7 +58,10 @@ class S3Driver implements StorageDriver {
   async put(key: string, body: Buffer, contentType: string) {
     const { PutObjectCommand } = await import("@aws-sdk/client-s3");
     const client = await this.clientPromise;
-    await client.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType, ServerSideEncryption: "AES256" }));
+    // AWS S3: request SSE-S3 explicitly. S3-compatible services (R2, B2, MinIO…) encrypt at rest
+    // themselves and some reject the header, so it is only sent when asked for or on AWS.
+    const sse = process.env.S3_SERVER_SIDE_ENCRYPTION || (process.env.S3_ENDPOINT ? "none" : "AES256");
+    await client.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType, ...(sse !== "none" ? { ServerSideEncryption: sse as "AES256" } : {}) }));
   }
   async get(key: string) {
     const { GetObjectCommand } = await import("@aws-sdk/client-s3");

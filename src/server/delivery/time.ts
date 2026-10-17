@@ -81,6 +81,11 @@ export async function updateTimeEntry(tx: Tx, actor: Actor, id: string, input: T
   await audit(tx, actor, { action: "time.updated", entityType: "time_entry", entityId: id, summary: `Time entry updated` });
 }
 
+/** Time you entered, or time recorded against your own person record (even if someone else entered it). */
+function ownEntry(actor: Actor, e: { userId: string | null; personId: string }) {
+  return (!!e.userId && e.userId === actor.userId) || (!!actor.personId && e.personId === actor.personId);
+}
+
 /**
  * Approve time. The cost rate in force on the work date is snapshotted so
  * later rate changes never alter historical profitability.
@@ -92,7 +97,7 @@ export async function approveTimeEntries(tx: Tx, actor: Actor, ids: string[]) {
   const missingRate: string[] = [];
   for (const e of rows) {
     if (e.status === "approved") continue;
-    if (e.userId && e.userId === actor.userId) throw new ForbiddenError("You cannot approve your own time.");
+    if (ownEntry(actor, e)) throw new ForbiddenError("You cannot approve your own time.");
     if (e.engagementId && !canAll(actor, "time.approve")) await assertEngagementAccess(tx, actor, e.engagementId, "time.approve");
     const rate = await costRateOn(tx, e.personId, e.workDate);
     if (!rate) missingRate.push(e.id);
@@ -125,7 +130,7 @@ export async function rejectTimeEntries(tx: Tx, actor: Actor, ids: string[], rea
   if (!reason.trim()) throw new ValidationError("Give a reason.");
   const existing = await tx.select().from(timeEntries).where(inArray(timeEntries.id, ids)).for("update");
   for (const e of existing) {
-    if (e.userId && e.userId === actor.userId) throw new ForbiddenError("You cannot review your own time.");
+    if (ownEntry(actor, e)) throw new ForbiddenError("You cannot review your own time.");
     if (e.status === "approved" && !canAll(actor, "time.approve")) throw new ForbiddenError("Only full approvers can reopen approved time.");
     if (e.engagementId && !canAll(actor, "time.approve")) await assertEngagementAccess(tx, actor, e.engagementId, "time.approve");
   }

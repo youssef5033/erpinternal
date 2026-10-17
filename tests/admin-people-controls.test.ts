@@ -45,6 +45,10 @@ describe("time approval", () => {
     const own = await db.transaction((tx) => logTime(tx, A.operations_manager, { workDate: "2026-10-05", hours: "2", engagementId: eng.id, billable: true }));
     await expect(db.transaction((tx) => approveTimeEntries(tx, A.operations_manager, [own.id]))).rejects.toBeInstanceOf(ForbiddenError);
     await expect(db.transaction((tx) => rejectTimeEntries(tx, A.operations_manager, [own.id], "fix"))).rejects.toBeInstanceOf(ForbiddenError);
+    // Time recorded against your own person record is still yours, even when someone else entered it
+    const [opsPerson] = await db.select().from(people).where(eq(people.userId, A.operations_manager.userId));
+    const onBehalf = await db.transaction((tx) => logTime(tx, A.owner, { personId: opsPerson.id, workDate: "2026-10-06", hours: "1", engagementId: eng.id, billable: true }));
+    await expect(db.transaction((tx) => approveTimeEntries(tx, A.operations_manager, [onBehalf.id]))).rejects.toBeInstanceOf(ForbiddenError);
     await db.transaction((tx) => setEngagementMembers(tx, A.operations_manager, eng.id, [{ userId: A.team_member.userId }]));
     const theirs = await db.transaction((tx) => logTime(tx, A.team_member, { workDate: "2026-10-05", hours: "3", engagementId: eng.id, billable: true }));
     await db.transaction((tx) => approveTimeEntries(tx, A.operations_manager, [theirs.id]));

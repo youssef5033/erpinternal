@@ -80,7 +80,9 @@ tests/               Vitest integration tests against a real PostgreSQL
 
 ## Background jobs
 
-`npm run worker` starts pg-boss. Job definitions live in
+`npm run worker` starts pg-boss. With `JOBS_IN_WEB=true` (used by the
+Render Blueprint) the web server runs the same worker itself, through
+`src/instrumentation.ts`. Job definitions live in
 `src/server/jobs/registry.ts`.
 
 | Job | Schedule (UTC) | What it does |

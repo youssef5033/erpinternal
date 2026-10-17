@@ -509,7 +509,9 @@ export async function seedDemo(db: DB, opts: { force?: boolean; password?: strin
       [E.solace, "owner", 30, -160, -2], [E.solace, "pm", 36, -160, -1],
       [E.atlasExec, "owner", 12, -18, -1],
     ];
+    // Nobody approves their own time: the owner's entries are approved by operations, the rest by the owner.
     const ids: string[] = [];
+    const ownerIds: string[] = [];
     for (const [eng, who, total, from, to] of plan) {
       const days: string[] = [];
       for (let d = from; d <= to; d++) {
@@ -524,7 +526,8 @@ export async function seedDemo(db: DB, opts: { force?: boolean; password?: strin
         const h = Math.min(perDay, left, 8);
         if (who === "designer" && day > T(-6)) continue; // leaves a gap → missing-time signal
         const e = await logTime(tx, U.owner, { personId: U[who].personId!, workDate: day, hours: h.toFixed(2), engagementId: eng, description: "Delivery work" });
-        if (day < T(-3)) ids.push(e.id);
+        await tx.update(timeEntries).set({ userId: U[who].userId }).where(eq(timeEntries.id, e.id)); // entered by the person themselves
+        if (day < T(-3)) (who === "owner" ? ownerIds : ids).push(e.id);
         left -= h;
       }
     }
@@ -535,10 +538,12 @@ export async function seedDemo(db: DB, opts: { force?: boolean; password?: strin
       if (dow === 0 || dow === 6) continue;
       for (const who of ["sales", "ops", "finance"]) {
         const e = await logTime(tx, U.owner, { personId: U[who].personId!, workDate: iso, hours: who === "sales" ? "6" : "3", billable: false, description: who === "sales" ? "Business development" : "Internal operations" });
+        await tx.update(timeEntries).set({ userId: U[who].userId }).where(eq(timeEntries.id, e.id));
         if (d < -3) ids.push(e.id);
       }
     }
     await approveTimeEntries(tx, U.owner, ids);
+    await approveTimeEntries(tx, U.ops, ownerIds);
     await tx.update(engagementMembers).set({ allocationHoursPerWeek: "16" }).where(eq(engagementMembers.engagementId, E.atlas));
   });
   log("time entries");
