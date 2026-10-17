@@ -3,9 +3,9 @@
  * database name contains "demo" or the user passes --i-understand.
  */
 import "dotenv/config";
-import { execSync } from "node:child_process";
 import { rm } from "node:fs/promises";
 import { db, pool } from "@/db/client";
+import { runMigrations } from "@/db/migrate";
 import { seedDemo } from "@/server/system/demo-seed";
 
 async function main() {
@@ -14,7 +14,7 @@ async function main() {
   if (!url.pathname.includes("demo") && !process.argv.includes("--i-understand")) {
     throw new Error(`Database "${url.pathname.slice(1)}" does not look like a demo database. Re-run with --i-understand if you are sure.`);
   }
-  execSync("npx drizzle-kit migrate", { stdio: "inherit" });
+  await runMigrations(db);
   const { rows } = await pool.query(`select tablename from pg_tables where schemaname = 'public'`);
   await pool.query(`truncate ${rows.map((r) => `"${r.tablename}"`).join(", ")} restart identity cascade`);
   await pool.query(`drop schema if exists pgboss cascade`);

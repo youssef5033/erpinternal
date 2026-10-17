@@ -17,9 +17,9 @@
  * not end up in shell history).
  */
 import "dotenv/config";
-import { execSync } from "node:child_process";
 import { count, eq } from "drizzle-orm";
 import { db, pool } from "@/db/client";
+import { runMigrations } from "@/db/migrate";
 import { user } from "@/db/schema";
 import { ensureReferenceData, upsertUser } from "@/server/system/bootstrap";
 import { seedDemo } from "@/server/system/demo-seed";
@@ -36,7 +36,7 @@ function ownerPassword() {
 }
 
 async function main() {
-  execSync("npx drizzle-kit migrate", { stdio: "inherit" });
+  await runMigrations(db);
 
   const [{ n }] = await db.select({ n: count() }).from(user);
   if (process.argv.includes("--seed-demo-if-empty") && process.env.APP_ENV === "demo" && n === 0) {

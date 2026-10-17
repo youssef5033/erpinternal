@@ -14,8 +14,8 @@ This is internal only. There is no client portal.
 - **Storage:** private document storage, either local disk or S3-compatible.
 
 **Hosting it in the cloud:** see [`docs/DEPLOY.md`](docs/DEPLOY.md). It
-covers a one-click Render Blueprint with the app, database and document
-storage.
+covers a free setup (Render + Supabase, $0 a month) and a paid
+single-provider setup on Render.
 
 Further docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 [`docs/ACCOUNTING.md`](docs/ACCOUNTING.md),
@@ -64,7 +64,9 @@ npm run worker                  # one worker process
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `DATABASE_URL` | yes | PostgreSQL connection string. Production and demo **must** use different databases. |
+| `DATABASE_URL` | yes | PostgreSQL connection string. Production and demo **must** use different databases. A database on a public hostname must use TLS, or the app refuses to start. |
+| `DATABASE_CA_CERT` | hosted DB | The provider's CA certificate (PEM text), used for encrypted and verified connections (for example Supabase). |
+| `DB_POOL_MAX`, `PGBOSS_POOL_MAX` | no | Connection limits for the app and the job queue. Default 10 each. |
 | `APP_ENV` | yes | `production`, `demo` or `development`. In `demo` the app shows a permanent DEMO banner, and `demo:reset` is allowed. |
 | `BETTER_AUTH_URL` | yes* | Public base URL, used for cookies and auth callbacks. *On Render it defaults to the service URL. |
 | `BETTER_AUTH_SECRET` | yes | 32+ random bytes (`openssl rand -base64 32`). Signs sessions. |

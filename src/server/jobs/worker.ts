@@ -1,5 +1,6 @@
 import { PgBoss } from "pg-boss";
 import { db } from "@/db/client";
+import { pgConfig } from "@/db/connection";
 import { JOBS, runJob } from "./registry";
 
 /**
@@ -16,7 +17,8 @@ export async function startWorker(log: (m: string) => void = console.log): Promi
     log("JOBS_ENABLED=false — worker not started.");
     return null;
   }
-  const boss = new PgBoss({ connectionString: process.env.DATABASE_URL!, schema: "pgboss" });
+  const { connectionString, ssl } = pgConfig();
+  const boss = new PgBoss({ connectionString, ssl, schema: "pgboss", max: Number(process.env.PGBOSS_POOL_MAX ?? 10) });
   boss.on("error", (e) => console.error("[pg-boss]", e));
   await boss.start();
   for (const job of JOBS) {
@@ -30,6 +32,18 @@ export async function startWorker(log: (m: string) => void = console.log): Promi
     });
     log(`[worker] scheduled ${job.name} (${job.cron})`);
   }
+  // Catch up after downtime (deploys, or a free instance that was asleep): run each job for the
+  // current period unless it already ran. Idempotent per period, so nothing runs twice.
+  void (async () => {
+    for (const job of JOBS) {
+      try {
+        const res = await runJob(db, job.name, { triggeredBy: "startup-catch-up" });
+        if (res.status === "succeeded") log(`[worker] caught up ${job.name} (${res.key})`);
+      } catch (e) {
+        console.error(`[worker] catch-up of ${job.name} failed`, e);
+      }
+    }
+  })();
   return async () => {
     log("[worker] stopping…");
     await boss.stop();

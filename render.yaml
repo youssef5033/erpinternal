@@ -1,47 +1,54 @@
-# Render Blueprint: one web service (which also runs the background jobs), a
-# private PostgreSQL database and a persistent disk for uploaded documents.
+# FREE setup (US$0/month): one free Render web service that also runs the
+# background jobs. The database and document storage live in a free Supabase
+# project. Step-by-step guide: docs/DEPLOY.md.
 # Deploy: Render dashboard → New → Blueprint → pick this repository and branch.
-# See docs/DEPLOY.md for costs, first login and switching to real use.
+# Render asks for every value marked `sync: false`.
 services:
   - type: web
     name: agency-erp
     runtime: node
-    plan: starter # persistent disks need a paid instance
+    plan: free
     buildCommand: npm ci --include=dev && npm run build
-    # Applies migrations and reference data on every deploy; loads the demo
-    # data set only into an empty database while APP_ENV=demo.
-    startCommand: npm run db:setup -- --seed-demo-if-empty && npm start
+    # Applies migrations on every deploy; loads the demo data only into an empty
+    # database while APP_ENV=demo. On wake-up the app catches up missed jobs.
+    # 512 MB instance: the server is started directly (not via `npm start`, saving ~80 MB)
+    # with a capped JavaScript heap so memory is reclaimed well before the limit. The cap
+    # is on the start command only, so the build keeps its full memory.
+    startCommand: npm run db:setup -- --seed-demo-if-empty && node --max-old-space-size=256 node_modules/next/dist/bin/next start
     healthCheckPath: /api/health
-    disk:
-      name: documents
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: "22"
-      - key: DATABASE_URL
-        fromDatabase:
-          name: agency-erp-db
-          property: connectionString
       - key: APP_ENV
         value: demo # change to "production" for real use (see docs/DEPLOY.md)
       - key: BETTER_AUTH_SECRET
         generateValue: true
       - key: CREDENTIALS_ENCRYPTION_KEY
         generateValue: true # random 256-bit value, base64
-      - key: STORAGE_DRIVER
-        value: local
-      - key: STORAGE_LOCAL_DIR
-        value: /var/data/storage
       - key: JOBS_IN_WEB
         value: "true"
+      # Supabase's free connection pooler allows about 15 connections in total.
+      - key: DB_POOL_MAX
+        value: "5"
+      - key: PGBOSS_POOL_MAX
+        value: "4"
       - key: DEMO_PASSWORD
-        sync: false # Render asks for it when the Blueprint is created; choose a strong one
-
-databases:
-  - name: agency-erp-db
-    databaseName: agency_erp_demo
-    user: agency_erp
-    plan: basic-256mb
-    postgresMajorVersion: "16"
-    ipAllowList: [] # reachable only from your Render services, not the internet
+        sync: false # choose a strong one: the login page is on the public internet
+      # --- Supabase database (Connect → Session pooler) ---
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_CA_CERT
+        sync: false # contents of the certificate from Database Settings → SSL Configuration
+      # --- Supabase Storage, S3 connection (Storage → Settings) ---
+      - key: STORAGE_DRIVER
+        value: s3
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false

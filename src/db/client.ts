@@ -1,5 +1,6 @@
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { pgConfig } from "./connection";
 import * as schema from "./schema";
 
 export type Schema = typeof schema;
@@ -14,7 +15,7 @@ function createPool() {
   // `next build` loads route modules without querying; pg pools connect lazily, so the
   // build works on hosts that only provide DATABASE_URL at runtime.
   if (!url && process.env.NEXT_PHASE !== "phase-production-build") throw new Error("DATABASE_URL is not set. See .env.example.");
-  return new Pool({ connectionString: url, max: Number(process.env.DB_POOL_MAX ?? 10) });
+  return new Pool(pgConfig({ max: Number(process.env.DB_POOL_MAX ?? 10) }));
 }
 
 export const pool = globalForDb.__pgPool ?? createPool();
