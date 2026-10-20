@@ -125,25 +125,48 @@ Starter in their dashboards. No code changes are needed.
 
 Keep demo data and real data apart. Never type real records into the demo.
 
+### Option A: reuse the same Supabase project (simplest)
+
+The demo is wiped once and the same database and storage start clean.
+
+1. In Render, open the web service and go to **Environment**. Change or add:
+   - `APP_ENV`: `production`. This removes the DEMO banner, and demo data is
+     never loaded again.
+   - `CLEAR_DEMO_DATA`: `true`. This empties the database **only if it
+     contains nothing but the demo accounts** (`@demo.agency`). If any other
+     account exists it refuses and deletes nothing. Once the demo is gone,
+     the setting does nothing, so leaving it set is harmless; remove it when
+     convenient.
+   - `OWNER_EMAIL`, `OWNER_NAME`, and `OWNER_PASSWORD` (a temporary password
+     of at least 10 characters). These create your own Owner login.
+   - Delete `DEMO_PASSWORD`.
+2. Click **Save, rebuild, and deploy**. The log shows
+   `CLEAR_DEMO_DATA: removed the demo data…` and then
+   `Owner account created: …`.
+3. Optional: in Supabase **Storage → erp-documents**, delete the demo's
+   uploaded files to free space. The app no longer refers to them.
+
+### Option B: a separate Supabase project for real data
+
+Use this if you want to keep the demo running for training.
+
 1. Create a **second Supabase project**, for example `agency-erp-prod`, and
    repeat steps 1–2 for it.
-2. In Render, open the web service, go to **Environment**, and update:
-   - `DATABASE_URL`, `DATABASE_CA_CERT` and the `S3_*` values: the new
-     project's values.
-   - `APP_ENV`: `production`. This removes the DEMO banner, and demo data is
-     never loaded.
-   - Add `OWNER_EMAIL`, `OWNER_NAME`, and `OWNER_PASSWORD` (a temporary
-     password of at least 10 characters).
-   - Delete `DEMO_PASSWORD`.
+2. In Render, update `DATABASE_URL`, `DATABASE_CA_CERT` and the `S3_*`
+   values to the new project's values. Set `APP_ENV` to `production`, add
+   `OWNER_EMAIL`, `OWNER_NAME` and `OWNER_PASSWORD`, and delete
+   `DEMO_PASSWORD`.
 3. Save. Render redeploys, creates the empty database structure and your
    Owner account.
-4. Sign in, change your password under **Account**, then delete
+
+### Then, either way
+1. Sign in, change your password under **Account**, then delete
    `OWNER_PASSWORD` from Render. The Owner is created only when it doesn't
    exist, so later deploys never reset your password.
-5. Go to **System → Settings** and set the agency name, base currency, fiscal
+2. Go to **System → Settings** and set the agency name, base currency, fiscal
    year, time zone and invoice numbering **before** posting anything. The base
    currency locks once the first journal exists.
-6. Create your team under **Users & Permissions → Users**.
+3. Create your team under **Users & Permissions → Users**.
 
 ## Custom domain (optional)
 

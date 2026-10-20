@@ -42,6 +42,8 @@ async function main() {
   const { seedDemo } = await import("@/server/system/demo-seed");
   await runMigrations(db);
 
+  if (process.env.CLEAR_DEMO_DATA === "true") await clearDemoData();
+
   const [{ n }] = await db.select({ n: count() }).from(user);
   if (process.argv.includes("--seed-demo-if-empty") && process.env.APP_ENV === "demo" && n === 0) {
     console.log("Empty demo database: loading demo data…");
@@ -76,6 +78,32 @@ async function main() {
   await pool!.end();
 }
 
+/**
+ * CLEAR_DEMO_DATA=true with APP_ENV=production: empties a database that holds
+ * only the demo data set, so the same database can start clean for real use.
+ * It refuses as soon as any account outside @demo.agency exists, so real data
+ * is never touched, and leaving the variable set afterwards is harmless (once
+ * the demo accounts are gone there is nothing to clear).
+ */
+async function clearDemoData() {
+  if (process.env.APP_ENV !== "production") throw new Error("CLEAR_DEMO_DATA needs APP_ENV=production (otherwise the demo would just be loaded again).");
+  const { rows } = await pool!.query<{ demo: number; other: number }>(
+    `select count(*) filter (where email like '%@demo.agency')::int as demo, count(*) filter (where email not like '%@demo.agency')::int as other from "user"`,
+  );
+  const { demo, other } = rows[0];
+  if (demo === 0) {
+    console.log("CLEAR_DEMO_DATA: no demo data found; nothing cleared. You can remove the CLEAR_DEMO_DATA setting.");
+    return;
+  }
+  if (other > 0) {
+    throw new Error(`CLEAR_DEMO_DATA refused: the database has ${other} account(s) outside @demo.agency, so it may contain real data. Nothing was deleted.`);
+  }
+  const tables = await pool!.query<{ tablename: string }>(`select tablename from pg_tables where schemaname = 'public'`);
+  await pool!.query(`truncate ${tables.rows.map((r) => `"${r.tablename}"`).join(", ")} restart identity cascade`);
+  await pool!.query(`drop schema if exists pgboss cascade`);
+  console.log(`CLEAR_DEMO_DATA: removed the demo data (${demo} demo accounts and all their records). The database is now empty.`);
+}
+
 /** Plain-language hint for the connection problems people hit when hosting (never prints secrets). */
 function explain(e: unknown): string | null {
   // Database libraries wrap the original error (e.g. "Failed query: …", cause: the real error).
@@ -93,7 +121,7 @@ function explain(e: unknown): string | null {
     return "Could not reach the database. Use the Session pooler string (host ...pooler.supabase.com, port 5432), not the Direct connection, and check the Supabase project is not paused.";
   if (code === "ERR_INVALID_URL" || /Invalid URL/i.test(msg)) return "DATABASE_URL is not a valid address. If your password contains characters like @ # / ? %, reset it in Supabase to one with only letters and numbers.";
   if (/DATABASE_URL is not set/.test(msg)) return "DATABASE_URL is missing in Render → Environment.";
-  if (/OWNER_PASSWORD/.test(msg)) return msg;
+  if (/OWNER_PASSWORD|CLEAR_DEMO_DATA/.test(msg)) return msg;
   return null;
 }
 
