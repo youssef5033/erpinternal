@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { DropdownMenu } from "radix-ui";
 import { buttonClass } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
+import { signalNavigation } from "./nav-progress";
 
 export type QuickAction = { label: string; href: string };
 
@@ -34,7 +35,10 @@ export function Topbar({ quickActions, userName, userEmail, roleNames, unread, s
         onSubmit={(e) => {
           e.preventDefault();
           const q = searchRef.current?.value.trim();
-          if (q) router.push(`/search?q=${encodeURIComponent(q)}`);
+          if (q) {
+            signalNavigation();
+            router.push(`/search?q=${encodeURIComponent(q)}`);
+          }
         }}
       >
         <label htmlFor="global-search" className="sr-only">
@@ -55,7 +59,10 @@ export function Topbar({ quickActions, userName, userEmail, roleNames, unread, s
         <DropdownMenu.Portal>
           <DropdownMenu.Content align="end" sideOffset={6} className={menuContent}>
             {quickActions.map((a) => (
-              <DropdownMenu.Item key={a.href} className={menuItem} onSelect={() => router.push(a.href)}>
+              <DropdownMenu.Item key={a.href} className={menuItem} onSelect={() => {
+                  signalNavigation();
+                  router.push(a.href);
+                }}>
                 {a.label}
               </DropdownMenu.Item>
             ))}
@@ -85,7 +92,10 @@ export function Topbar({ quickActions, userName, userEmail, roleNames, unread, s
               <p className="mt-1 text-[11.5px] text-faint">{roleNames.join(", ") || "No role"}</p>
             </div>
             <DropdownMenu.Separator className="my-1 h-px bg-line" />
-            <DropdownMenu.Item className={menuItem} onSelect={() => router.push("/account")}>
+            <DropdownMenu.Item className={menuItem} onSelect={() => {
+                signalNavigation();
+                router.push("/account");
+              }}>
               My profile & time zone
             </DropdownMenu.Item>
             <DropdownMenu.Item className={menuItem} onSelect={() => void signOut().then(() => router.push("/login"))}>

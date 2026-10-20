@@ -1,6 +1,6 @@
-import { index, jsonb, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, index, integer, jsonb, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { pk, ts } from "./_helpers";
+import { day, pk, timestamps, ts } from "./_helpers";
 import { user } from "./auth";
 
 export type SignalSeverity = "info" | "warning" | "critical";
@@ -54,4 +54,43 @@ export const signalEvents = pgTable(
     createdAt: ts("created_at").defaultNow().notNull(),
   },
   (t) => [index("signal_events_signal_idx").on(t.signalId)],
+);
+
+export type GoalPeriod = "day" | "week";
+export type GoalStatus = "open" | "done" | "carried";
+
+/**
+ * Personal daily and weekly goals (src/server/ops/goals.ts). Each belongs to
+ * one user and one period: a day, or a week starting on Monday. Goals can
+ * have a numeric target ("5 discovery calls") tracked by progress. Unfinished
+ * goals can be carried into the next period; the original is kept as
+ * "carried" and linked, so history shows what slipped.
+ */
+export const goals = pgTable(
+  "goals",
+  {
+    id: pk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    period: text("period").$type<GoalPeriod>().notNull(),
+    periodStart: day("period_start").notNull(),
+    title: text("title").notNull(),
+    target: integer("target"),
+    progress: integer("progress").notNull().default(0),
+    status: text("status").$type<GoalStatus>().notNull().default("open"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    carriedFromId: uuid("carried_from_id"),
+    completedAt: ts("completed_at"),
+    ...timestamps,
+  },
+  (t) => [
+    index("goals_user_period_idx").on(t.userId, t.period, t.periodStart),
+    // A goal can be carried forward only once.
+    uniqueIndex("goals_carried_from_uq").on(t.carriedFromId),
+    check("goals_period_chk", sql`${t.period} in ('day', 'week')`),
+    check("goals_status_chk", sql`${t.status} in ('open', 'done', 'carried')`),
+    check("goals_target_chk", sql`${t.target} is null or ${t.target} > 0`),
+    check("goals_progress_chk", sql`${t.progress} >= 0`),
+  ],
 );

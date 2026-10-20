@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { after } from "next/server";
 import { desc, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accounts, auditEvents, signals, user } from "@/db/schema";
@@ -16,11 +17,15 @@ import { FilterBar } from "@/components/ui/filter-bar";
 import { ActionForm, SubmitButton } from "@/components/forms/action-form";
 import { dismissSignalAction, refreshSignalsAction, runJobNowAction, snoozeSignalAction } from "@/server/actions/ops";
 import { Input } from "@/components/forms/fields";
+import { GoalsCard } from "@/components/ops/goals";
+import { goalHistory, listGoals, openInPreviousPeriod, periodStartFor } from "@/server/ops/goals";
+import { isISODate } from "@/lib/dates";
 
 export const metadata = { title: "Daily dashboard" };
 
 const TABS = [
   { key: "my-day", label: "My day" },
+  { key: "goals", label: "Goals" },
   { key: "numbers", label: "Numbers & evidence" },
   { key: "pipeline", label: "Pipeline & capacity" },
   { key: "setup", label: "Complete setup" },
@@ -48,10 +53,11 @@ export default async function OperationsPage({ searchParams }: { searchParams: P
   const tab = TABS.some((t) => t.key === sp.tab) ? sp.tab! : "my-day";
   const settings = await getSettings(db);
   const today = await agencyToday(db);
-  // Signals are recalculated from source records when stale (job also runs every 15 min).
+  // Signals are recalculated by the job every 15 minutes. If they are older than 5 minutes,
+  // refresh them *after* this page has been sent, so the dashboard never waits for it.
   const last = await lastSignalRefresh(db);
-  if (!last || nowMs() - last.getTime() > 2 * 60 * 1000) {
-    await db.transaction((tx) => refreshSignals(tx));
+  if (!last || nowMs() - last.getTime() > 5 * 60 * 1000) {
+    after(() => db.transaction((tx) => refreshSignals(tx)).catch((e) => console.error("[signals] background refresh failed", e)));
   }
   const activeSignals = await db.select({ n: sql<number>`count(*)` }).from(signals).where(sql`${signals.status} = 'active'`);
   const hour = new Date().getUTCHours();
@@ -64,7 +70,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: P
         title={`${greet}, ${actor.name.split(" ")[0]}`}
         description={`${formatDate(today, "EEEE d MMMM yyyy")} · Everything that needs attention today, with the evidence behind it. Work is drawn from tasks, deliverables, deals, invoices and approvals across the agency.`}
         actions={
-          <ActionForm action={refreshSignalsAction} hideSuccess>
+          <ActionForm action={refreshSignalsAction} className="flex flex-col items-end">
             <SubmitButton variant="secondary" size="sm">
               Recalculate signals
             </SubmitButton>
@@ -72,7 +78,8 @@ export default async function OperationsPage({ searchParams }: { searchParams: P
         }
       />
       <Tabs tabs={TABS.map((t) => ({ ...t, href: href(t.key), count: t.key === "signals" ? Number(activeSignals[0].n) : null }))} current={tab} />
-      {tab === "my-day" ? <MyDay sp={sp} /> : null}
+      {tab === "my-day" ? <MyDay sp={sp} today={today} /> : null}
+      {tab === "goals" ? <GoalsTab sp={sp} today={today} /> : null}
       {tab === "numbers" ? <Numbers sp={sp} fiscalStart={settings.fiscalYearStartMonth} today={today} /> : null}
       {tab === "pipeline" ? <Pipeline /> : null}
       {tab === "setup" ? <Setup /> : null}
@@ -84,8 +91,15 @@ export default async function OperationsPage({ searchParams }: { searchParams: P
 
 /* ---------------------------------------------------------------- */
 
-async function MyDay({ sp }: { sp: SP }) {
+async function MyDay({ sp, today }: { sp: SP; today: string }) {
   const actor = await guard("operations.view");
+  const [dayGoals, weekGoals, dayLeft, weekLeft] = await Promise.all([
+    listGoals(db, actor, "day", today),
+    listGoals(db, actor, "week", today),
+    openInPreviousPeriod(db, actor, "day", today),
+    openInPreviousPeriod(db, actor, "week", today),
+  ]);
+  const weekStart = periodStartFor("week", today);
   const data = await myDay(db, actor, { owner: sp.owner, team: sp.team, client: sp.client, service: sp.service, priority: sp.priority, to: sp.to, q: sp.q });
   const clients = await db.select({ id: accounts.id, name: accounts.name }).from(accounts).where(inArray(accounts.lifecycleStatus, ["active", "onboarding", "prospect"])).orderBy(accounts.name);
   const order: WorkItem["section"][] = ["overdue", "approvals", "tasks", "deliverables", "collections", "client_followups", "blocked"];
@@ -98,6 +112,10 @@ async function MyDay({ sp }: { sp: SP }) {
     .limit(12);
   return (
     <>
+      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+        <GoalsCard title="Today's goals" description={formatDate(today, "EEEE d MMMM")} period="day" date={today} goals={dayGoals} openBefore={dayLeft} />
+        <GoalsCard title="This week's goals" description={`Week of ${formatDate(weekStart, "d MMMM")}`} period="week" date={today} goals={weekGoals} openBefore={weekLeft} />
+      </div>
       <FilterBar
         keep={["tab"]}
         fields={[
@@ -247,6 +265,78 @@ async function SignalsSummary() {
         <EmptyState title="No active signals" description="Nothing needs review right now." />
       )}
     </Card>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+
+/** Week-by-week view of personal goals: the week's goals, each day's goals, and recent completion. */
+async function GoalsTab({ sp, today }: { sp: SP; today: string }) {
+  const actor = await guard("operations.view");
+  const thisWeek = periodStartFor("week", today);
+  const week = isISODate(sp.week) ? periodStartFor("week", sp.week!) : thisWeek;
+  const days = Array.from({ length: 7 }, (_, i) => addDaysISO(week, i));
+  const isPast = (d: string) => d < today;
+  const [weekGoals, weekLeft, dayLists, weeks] = await Promise.all([
+    listGoals(db, actor, "week", week),
+    week === thisWeek ? openInPreviousPeriod(db, actor, "week", week) : Promise.resolve(0),
+    Promise.all(days.map(async (d) => ({ d, goals: await listGoals(db, actor, "day", d), left: d === today ? await openInPreviousPeriod(db, actor, "day", d) : 0 }))),
+    goalHistory(db, actor, "week", today, 8),
+  ]);
+  const nav = (w: string | null) => `/operations${qs({ tab: "goals", week: w })}`;
+  return (
+    <>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <LinkButton size="sm" href={nav(addDaysISO(week, -7))} aria-label="Previous week">←</LinkButton>
+        <LinkButton size="sm" href={nav(null)}>This week</LinkButton>
+        <LinkButton size="sm" href={nav(addDaysISO(week, 7))} aria-label="Next week">→</LinkButton>
+        <h2 className="ml-2 text-[16px] font-semibold">
+          Week of {formatDate(week, "d MMMM yyyy")}
+          {week === thisWeek ? <span className="ml-2 text-[12.5px] font-normal text-muted">(this week)</span> : null}
+        </h2>
+      </div>
+      <p className="mb-3 text-[12.5px] text-muted">Your goals are private to you. Set a few for the week, then break them into daily goals. Give a goal a number to track progress (e.g. 5 discovery calls). Unfinished goals can be carried into the next day or week.</p>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-4">
+          <GoalsCard title="Weekly goals" period="week" date={week} goals={weekGoals} openBefore={weekLeft} readOnly={addDaysISO(week, 6) < today} />
+          <div className="grid gap-4 md:grid-cols-2">
+            {dayLists.map(({ d, goals, left }) => (
+              <GoalsCard
+                key={d}
+                title={formatDate(d, "EEEE d MMM")}
+                description={d === today ? "Today" : undefined}
+                period="day"
+                date={d}
+                goals={goals}
+                openBefore={left}
+                readOnly={isPast(d)}
+                emptyText={d === today ? undefined : "No goals for this day yet."}
+                className={d === today ? "ring-1 ring-accent/40" : undefined}
+              />
+            ))}
+          </div>
+        </div>
+        <Card className="h-fit">
+          <CardHeader title="Last 8 weeks" description="Weekly goals completed. Goals carried forward count as not done that week." />
+          <ul className="divide-y divide-line">
+            {weeks
+              .slice()
+              .reverse()
+              .map((w) => (
+                <li key={w.start} className="px-4 py-2">
+                  <div className="flex justify-between text-[12.5px]">
+                    <Link href={nav(w.start === thisWeek ? null : w.start)} className="text-ink-2 hover:underline">
+                      {formatDate(w.start, "d MMM")}
+                    </Link>
+                    <span className="num text-muted">{w.total ? `${w.done}/${w.total}` : "—"}</span>
+                  </div>
+                  {w.total ? <Progress value={w.done} max={w.total} /> : null}
+                </li>
+              ))}
+          </ul>
+        </Card>
+      </div>
+    </>
   );
 }
 

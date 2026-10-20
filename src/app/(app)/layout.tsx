@@ -1,10 +1,12 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { db } from "@/db/client";
 import { notifications } from "@/db/schema";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar, type QuickAction } from "@/components/layout/topbar";
+import { NavProgress } from "@/components/layout/nav-progress";
 import { NAV } from "@/components/layout/nav";
 import { requireActor } from "@/server/auth/session";
 import { can } from "@/server/auth/actor";
@@ -41,6 +43,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen">
+      <Suspense fallback={null}>
+        <NavProgress />
+      </Suspense>
       <Sidebar sections={sections} agencyName={settings.agencyName} demo={demo} />
       <div className="lg:pl-60">
         {demo ? (

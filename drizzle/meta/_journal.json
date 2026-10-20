@@ -22,6 +22,13 @@
       "when": 1792071391791,
       "tag": "0002_signal_open_index",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792508115797,
+      "tag": "0003_goals",
+      "breakpoints": true
     }
   ]
 }

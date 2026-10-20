@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useTransition } from "react";
 import { cn } from "@/lib/utils";
+import { signalNavigation } from "@/components/layout/nav-progress";
 
 export type FilterField =
   | { type: "search"; name: string; placeholder?: string; label: string }
@@ -27,7 +28,10 @@ export function FilterBar({ fields, keep = [], className }: { fields: FilterFiel
       if (v) sp.set(k, v);
     }
     for (const [k, v] of fd.entries()) if (typeof v === "string" && v !== "") sp.set(k, v);
-    start(() => router.replace(`${pathname}${sp.toString() ? `?${sp}` : ""}`));
+    const next = `${pathname}${sp.toString() ? `?${sp}` : ""}`;
+    if (next === `${pathname}${params.toString() ? `?${params}` : ""}`) return; // nothing changed
+    signalNavigation();
+    start(() => router.replace(next));
   };
   const hasFilters = fields.some((f) => params.get(f.name));
   return (
@@ -75,6 +79,7 @@ export function FilterBar({ fields, keep = [], className }: { fields: FilterFiel
               if (v) sp.set(k, v);
             }
             formRef.current?.reset();
+            signalNavigation();
             start(() => router.replace(`${pathname}${sp.toString() ? `?${sp}` : ""}`));
           }}
         >
